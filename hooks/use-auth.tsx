@@ -2,7 +2,7 @@
 
 import type React from "react"
 import { createContext, useContext, useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, usePathname, useSearchParams } from "next/navigation"
 import { 
   supabase, 
   signInWithEmail, 
@@ -28,6 +28,7 @@ interface AuthContextType {
   register: (email: string, password: string, name: string) => Promise<{ success: boolean; error?: string }>
   logout: () => Promise<void>
   updateUserProfile: (updates: Partial<User>) => Promise<{ success: boolean; error?: string }>
+  resetSession: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -38,16 +39,48 @@ const AuthContext = createContext<AuthContextType>({
   register: async () => ({ success: false }),
   logout: async () => {},
   updateUserProfile: async () => ({ success: false }),
+  resetSession: async () => {},
 })
+
+// Função para limpar cookies e armazenamento local
+const clearAuthData = () => {
+  // Limpar cookies manualmente
+  document.cookie.split(";").forEach(function(c) {
+    document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
+  });
+  
+  // Limpar armazenamento local relacionado à autenticação
+  localStorage.removeItem('supabase.auth.token');
+  localStorage.removeItem('lastAuthCheck');
+}
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
+  const [authRetryCount, setAuthRetryCount] = useState(0)
   const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+  
+  // Verificar se estamos em uma página pública
+  const isPublicPage = 
+    pathname === '/' || 
+    pathname === '/login' || 
+    pathname === '/register' ||
+    pathname?.startsWith('/api')
+  
+  // Verificar parâmetro de limpeza
+  const cleanupRequested = searchParams?.get('cleanup') === 'true'
 
   // Verificar autenticação no carregamento inicial - versão simplificada
   useEffect(() => {
+    // Se for solicitada limpeza, limpar dados antes de verificar autenticação
+    if (cleanupRequested) {
+      console.log("🧹 [Auth] Limpeza de sessão solicitada")
+      clearAuthData()
+    }
+    
     const checkAuth = async () => {
       try {
         setIsLoading(true)
@@ -82,6 +115,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             
             if (profileError) {
               console.error("❌ [Auth] Erro ao buscar perfil:", profileError)
+              
+              // Se erro for de permissão, pode ser um problema com a sessão
+              if (profileError.message.includes("permission") && authRetryCount < 2) {
+                console.log("🔄 [Auth] Tentando renovar sessão...")
+                setAuthRetryCount(prev => prev + 1)
+                await resetSession()
+                return
+              }
             }
             
             if (profile) {
@@ -95,9 +136,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               setUser(userData)
               setIsAuthenticated(true)
               console.log("✅ [Auth] Usuário autenticado com sucesso:", userData.email)
+            } else if (authRetryCount < 2) {
+              // Perfil não encontrado, pode ser um problema com a API
+              console.log("🔄 [Auth] Perfil não encontrado, tentando novamente...")
+              setAuthRetryCount(prev => prev + 1)
+              setTimeout(checkAuth, 1000) // Tentar novamente após um segundo
             }
           } catch (profileError) {
             console.error("❌ [Auth] Erro ao buscar perfil:", profileError)
+            
+            // Se houver erro de conexão, tentar novamente
+            if (authRetryCount < 2) {
+              console.log("🔄 [Auth] Tentando novamente buscar perfil...")
+              setAuthRetryCount(prev => prev + 1)
+              setTimeout(checkAuth, 1500) // Tentar novamente após 1.5 segundos
+            }
           }
         }
       } catch (error) {
@@ -140,7 +193,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setIsAuthenticated(false)
           
           // Navegar para login de forma simples
-          if (window.location.pathname !== '/login' && window.location.pathname !== '/register') {
+          if (!isPublicPage) {
             router.push('/login')
           }
         }
@@ -150,18 +203,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => {
       authListener.subscription.unsubscribe()
     }
-  }, [router])
+  }, [router, authRetryCount, isPublicPage, cleanupRequested, pathname, searchParams])
+
+  // Função para reset completo da sessão
+  const resetSession = async () => {
+    try {
+      console.log("🔄 [Auth] Resetando completamente a sessão...")
+      
+      // Limpar estado
+      setUser(null)
+      setIsAuthenticated(false)
+      
+      // Primeiro tentar logout normal
+      try {
+        await signOut()
+      } catch (e) {
+        console.error("❌ [Auth] Erro no signOut durante reset:", e)
+      }
+      
+      // Limpar cookies e localStorage
+      clearAuthData()
+      
+      // Recarregar a página para garantir estado limpo
+      window.location.href = '/login?cleanup=true'
+    } catch (error) {
+      console.error("❌ [Auth] Erro ao resetar sessão:", error)
+    }
+  }
 
   // Função de login simplificada
   const login = async (email: string, password: string) => {
     try {
       // Limpar estado e cookies antigos antes de tentar fazer login
-      document.cookie.split(";").forEach(function(c) {
-        document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
-      });
-      
-      localStorage.removeItem('supabase.auth.token');
-      localStorage.removeItem('lastAuthCheck');
+      clearAuthData()
       
       // Fazer login
       const { data, error } = await signInWithEmail(email, password)
@@ -194,6 +268,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Função de registro
   const register = async (email: string, password: string, name: string) => {
     try {
+      // Limpar dados antigos primeiro
+      clearAuthData()
+      
       const { data, error } = await signUpWithEmail(email, password, { name })
       
       if (error) {
@@ -238,14 +315,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Fazer logout no Supabase
       await signOut()
       
-      // Limpar cookies manualmente para garantir limpeza completa
-      document.cookie.split(";").forEach(function(c) {
-        document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
-      });
-      
-      // Limpar qualquer armazenamento local relacionado à autenticação
-      localStorage.removeItem('supabase.auth.token');
-      localStorage.removeItem('lastAuthCheck');
+      // Limpar dados de autenticação
+      clearAuthData()
       
       // Redirecionar para a página de login
       router.push('/login')
@@ -258,6 +329,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         window.location.href = '/login';
       } catch (e) {
         console.error("❌ [Auth] Erro no logout de emergência:", e);
+        // Último recurso: recarregar a página para login
+        window.location.href = '/login?cleanup=true';
       }
     }
   }
@@ -308,7 +381,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         login, 
         register,
         logout,
-        updateUserProfile
+        updateUserProfile,
+        resetSession
       }}
     >
       {children}

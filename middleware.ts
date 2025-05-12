@@ -1,17 +1,6 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-// @ts-ignore - Ignorar erro de importação, o módulo existe em runtime
 import { createServerClient } from '@supabase/ssr'
-
-// Definição manual de tipos para CookieOptions
-interface CookieOptions {
-  domain?: string
-  path?: string
-  secure?: boolean
-  sameSite?: 'lax' | 'strict' | 'none'
-  maxAge?: number
-  httpOnly?: boolean
-}
 
 // Rotas públicas que não necessitam de autenticação
 const publicRoutes = [
@@ -45,18 +34,38 @@ export async function middleware(req: NextRequest) {
   }
   
   try {
-    // @ts-ignore - Ignorar erro de tipos, o módulo funciona em runtime
+    // Criar o cliente do Supabase
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
       {
         cookies: {
-          get: (name: string) => req.cookies.get(name)?.value,
-          set: (name: string, value: string, options: CookieOptions) => {
-            res.cookies.set({ name, value, ...options })
+          get(name) {
+            return req.cookies.get(name)?.value
           },
-          remove: (name: string, options: CookieOptions) => {
-            res.cookies.set({ name, value: '', ...options })
+          set(name, value, options) {
+            req.cookies.set({
+              name,
+              value,
+              ...options,
+            })
+            res.cookies.set({
+              name,
+              value,
+              ...options,
+            })
+          },
+          remove(name, options) {
+            req.cookies.set({
+              name,
+              value: '',
+              ...options,
+            })
+            res.cookies.set({
+              name,
+              value: '',
+              ...options,
+            })
           },
         },
       }

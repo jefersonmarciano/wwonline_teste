@@ -1,89 +1,81 @@
-# Aplicação de Draft e Gerenciamento de Times
+# Wuthering Waves Pick & Ban
 
-Este projeto é uma aplicação para gerenciar times, personagens e realizar drafts em tempo real usando Next.js e Supabase.
+Sistema de pick e ban para o jogo Wuthering Waves, permitindo criar salas de draft para escolher personagens em modo competitivo.
 
-## Funcionalidades
+## Principais Características
 
-- Sistema de autenticação com Supabase
-- Gerenciamento de personagens e armas
-- Criação de times e decks para torneios
-- Sistema de draft em tempo real entre dois jogadores
-- ID de jogador exclusivo para convites
+- **Sistema de draft**: Pick/ban de personagens com ordem pré-definida
+- **Salas multiplayer**: Crie salas e convide amigos para jogar
+- **Integração com Supabase**: Autenticação e banco de dados em tempo real
 
-## Configuração do Projeto
+## Solução de Problemas Comuns
+
+### Problemas de Login/Tela Preta
+
+Se você estiver enfrentando problemas ao fazer login, como tela preta após o login ou redirecionamentos infinitos:
+
+1. **Limpar sessão**: Clique no link "Problemas para entrar? Limpar sessão" na página de login
+2. **Limpar cookies do navegador**: Limpe os cookies específicos do site
+3. **Acessar com URL de limpeza**: Acesse diretamente `/login?cleanup=true`
+
+### Erros de Banco de Dados
+
+Se estiver enfrentando erros relacionados ao banco de dados, como "Could not find a relationship between 'friends' and 'friend_id'":
+
+1. Acesse a página do Dashboard que mostrará quais tabelas estão com problemas
+2. Siga as instruções para executar o script SQL de correção em `scripts/fix-database.sql`
+3. Para mais detalhes, consulte o arquivo `README-BANCO-DE-DADOS.md`
+
+## Desenvolvimento Local
 
 ### Pré-requisitos
 
-- Node.js 18.17 ou superior
-- Conta no Supabase (https://supabase.io)
+- Node.js (v18+)
+- NPM ou Yarn
+- [Supabase CLI](https://supabase.com/docs/guides/cli) (opcional)
 
 ### Instalação
 
 1. Clone o repositório
-   ```bash
-   git clone <repositório>
-   cd nome-do-projeto
+   ```
+   git clone <repository-url>
    ```
 
 2. Instale as dependências
-   ```bash
+   ```
    npm install
    ```
 
 3. Configure as variáveis de ambiente
-
-   Crie um arquivo `.env.local` na raiz do projeto com o seguinte conteúdo:
-
    ```
-   NEXT_PUBLIC_SUPABASE_URL=sua_url_do_supabase
-   NEXT_PUBLIC_SUPABASE_ANON_KEY=sua_chave_anon_do_supabase
+   cp .env.example .env.local
+   ```
+   
+4. Preencha as variáveis do Supabase no arquivo `.env.local`:
+   ```
+   NEXT_PUBLIC_SUPABASE_URL=sua-url-do-supabase
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=sua-chave-anonima-do-supabase
    ```
 
-4. Configure o banco de dados Supabase
-
-   Execute o script SQL presente em `scripts/setup-supabase.sql` no SQL Editor do seu projeto Supabase para criar todas as tabelas e políticas de segurança necessárias.
-
-5. Execute o projeto em modo de desenvolvimento
-   ```bash
+5. Execute o projeto
+   ```
    npm run dev
    ```
 
-## Estrutura do Aplicativo
+### Estrutura do Projeto
 
-- `/app` - Componentes da aplicação e páginas
+- `/app` - Rotas e páginas da aplicação (Next.js App Router)
 - `/components` - Componentes reutilizáveis
-- `/hooks` - Hooks personalizados (autenticação, draft, etc.)
-- `/lib` - Utilitários e configuração do Supabase
-- `/types` - Definições de tipos TypeScript
-- `/styles` - Estilos CSS globais
+- `/hooks` - Hooks personalizados (auth, drafts, etc.)
+- `/lib` - Bibliotecas e utilitários
 - `/public` - Arquivos estáticos
+- `/scripts` - Scripts úteis para configuração
+- `/types` - Definições de tipos TypeScript
 
-## Sistema de Draft
+## Tecnologias
 
-O sistema de draft segue a seguinte ordem:
-
-1. **Banimentos Iniciais:**
-   - Jogador 1 bane → Jogador 2 bane
-
-2. **Picks Iniciais:**
-   - Jogador 1 escolhe → Jogador 2 escolhe (4 rodadas)
-
-3. **Banimentos do Meio:**
-   - Jogador 1 bane → Jogador 2 bane
-
-4. **Picks Finais:**
-   - Jogador 1 escolhe → Jogador 2 escolhe (3 rodadas)
-
-## Uso do ID de Jogador
-
-Cada usuário recebe um ID de jogador único ao se registrar. Este ID pode ser compartilhado com outros jogadores para ser convidado para drafts.
-
-Para convidar um jogador para um draft:
-1. Vá para "Criar Nova Sala de Draft"
-2. Selecione seu deck
-3. Adicione o ID do oponente no campo adequado
-4. O oponente receberá uma notificação e poderá entrar na sala
-
-## Licença
-
-Este projeto está licenciado sob a Licença MIT - veja o arquivo LICENSE para detalhes. 
+- [Next.js](https://nextjs.org/) - Framework React
+- [Supabase](https://supabase.com/) - Backend as a Service
+- [Tailwind CSS](https://tailwindcss.com/) - Framework CSS
+- [Shadcn UI](https://ui.shadcn.com/) - Componentes UI
+- [TypeScript](https://www.typescriptlang.org/) - Linguagem tipada 
