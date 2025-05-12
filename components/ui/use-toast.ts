@@ -55,13 +55,28 @@ function useToastStore() {
   }
 }
 
-let store: ReturnType<typeof useToastStore>
-
-function getStore() {
-  if (!store) {
-    store = useToastStore()
+// Criar um store que funcione tanto no cliente quanto no servidor
+const createStore = () => {
+  return {
+    toasts: [],
+    toast: (props: Omit<ToastProps, 'id'>) => "",
+    dismiss: (id?: string) => {},
+    dismissAll: () => {}
   }
-  return store
+}
+
+// Usar um objeto vazio para o servidor
+let store: ReturnType<typeof useToastStore> | ReturnType<typeof createStore> = createStore()
+
+// Função que obtém o store no cliente ou retorna o store vazio no servidor
+function getStore() {
+  if (typeof window !== 'undefined') {
+    if (!('toast' in store)) {
+      store = useToastStore()
+    }
+    return store
+  }
+  return createStore()
 }
 
 export function toast(props: Omit<ToastProps, 'id'>) {
@@ -84,13 +99,15 @@ export function useToast() {
     // Auto dismiss toasts after timeout
     const timeouts: NodeJS.Timeout[] = []
     
-    store.toasts.forEach((toast) => {
-      const timeout = setTimeout(() => {
-        store.dismiss(toast.id)
-      }, TOAST_TIMEOUT)
-      
-      timeouts.push(timeout)
-    })
+    if (store.toasts && Array.isArray(store.toasts)) {
+      store.toasts.forEach((toast) => {
+        const timeout = setTimeout(() => {
+          store.dismiss(toast.id)
+        }, TOAST_TIMEOUT)
+        
+        timeouts.push(timeout)
+      })
+    }
     
     return () => {
       timeouts.forEach(clearTimeout)
@@ -98,7 +115,7 @@ export function useToast() {
   }, [store.toasts])
   
   return {
-    toasts: store.toasts,
+    toasts: store.toasts || [],
     toast: store.toast,
     dismiss: store.dismiss,
     dismissAll: store.dismissAll,

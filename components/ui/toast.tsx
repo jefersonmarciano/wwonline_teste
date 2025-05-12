@@ -56,9 +56,12 @@ export function Toast({ title, description, action, variant, onClose }: ToastPro
 export function Toaster() {
   const { toasts, dismiss } = useToast()
   
+  // Garantir que toasts é um array
+  const toastArray = Array.isArray(toasts) ? toasts : []
+  
   return (
     <div className="fixed bottom-4 right-4 z-[9999] flex flex-col gap-2">
-      {toasts.map((toast: UseToastProps) => (
+      {toastArray.map((toast: UseToastProps) => (
         <Toast
           key={toast.id}
           title={toast.title}
