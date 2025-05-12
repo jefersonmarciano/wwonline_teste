@@ -155,6 +155,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Função de login simplificada
   const login = async (email: string, password: string) => {
     try {
+      // Limpar estado e cookies antigos antes de tentar fazer login
+      document.cookie.split(";").forEach(function(c) {
+        document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
+      });
+      
+      localStorage.removeItem('supabase.auth.token');
+      localStorage.removeItem('lastAuthCheck');
+      
+      // Fazer login
       const { data, error } = await signInWithEmail(email, password)
       
       if (error) {
@@ -163,6 +172,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
         return { success: false, error: error.message }
       }
+      
+      // Garantir que a sessão esteja armazenada corretamente
+      await supabase.auth.getSession()
       
       // Após login bem-sucedido, redirecionar para o dashboard
       if (data.user) {
@@ -219,10 +231,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Função de logout simplificada
   const logout = async () => {
     try {
+      // Limpar estado local primeiro
+      setUser(null)
+      setIsAuthenticated(false)
+      
+      // Fazer logout no Supabase
       await signOut()
+      
+      // Limpar cookies manualmente para garantir limpeza completa
+      document.cookie.split(";").forEach(function(c) {
+        document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
+      });
+      
+      // Limpar qualquer armazenamento local relacionado à autenticação
+      localStorage.removeItem('supabase.auth.token');
+      localStorage.removeItem('lastAuthCheck');
+      
+      // Redirecionar para a página de login
       router.push('/login')
     } catch (error) {
       console.error("❌ [Auth] Erro ao fazer logout:", error)
+      
+      // Em caso de erro, tentar forçar um logout mais agressivo
+      try {
+        await supabase.auth.signOut({ scope: 'global' });
+        window.location.href = '/login';
+      } catch (e) {
+        console.error("❌ [Auth] Erro no logout de emergência:", e);
+      }
     }
   }
 

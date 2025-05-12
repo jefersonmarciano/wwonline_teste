@@ -32,6 +32,29 @@ function LoginForm() {
     }
   }, [isAuthenticated, router])
 
+  // Adicionar código para limpar cookies corrompidos ao entrar na página
+  useEffect(() => {
+    // Verificar se há um parâmetro de limpeza na URL
+    const cleanupRequested = searchParams.get('cleanup') === 'true'
+    
+    if (cleanupRequested) {
+      console.log("Executando limpeza de sessão...")
+      
+      // Limpar cookies manualmente
+      document.cookie.split(";").forEach(function(c) {
+        document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
+      });
+      
+      // Limpar localStorage
+      localStorage.clear();
+      
+      // Remover parâmetro cleanup da URL
+      window.history.replaceState(null, '', '/login')
+      
+      setSuccess("Sessão limpa com sucesso. Tente fazer login novamente.")
+    }
+  }, [searchParams])
+
   // Verificar se o usuário foi redirecionado após o registro
   useEffect(() => {
     if (searchParams.get('registered') === 'true') {
@@ -84,6 +107,18 @@ function LoginForm() {
     } finally {
       setIsLoading(false)
     }
+  }
+
+  // Função para limpar a sessão manualmente
+  const handleCleanSession = () => {
+    // Limpar cookies e local storage
+    document.cookie.split(";").forEach(function(c) {
+      document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
+    });
+    localStorage.clear();
+    
+    // Recarregar a página com parâmetro de limpeza
+    window.location.href = '/login?cleanup=true';
   }
 
   return (
@@ -153,6 +188,16 @@ function LoginForm() {
               Registre-se
             </Link>
           </div>
+          
+          <Button 
+            type="button" 
+            variant="ghost" 
+            size="sm" 
+            className="mt-2 text-xs text-muted-foreground" 
+            onClick={handleCleanSession}
+          >
+            Problemas para entrar? Limpar sessão
+          </Button>
         </CardFooter>
       </form>
     </Card>
