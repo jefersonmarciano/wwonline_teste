@@ -7,7 +7,20 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/hooks/use-auth"
-import { LayoutDashboard, Users, Trophy, History, Settings, LogOut, Menu, X, Swords, Database } from "lucide-react"
+import { 
+  LayoutDashboard, 
+  Users, 
+  Trophy, 
+  History, 
+  Settings, 
+  LogOut, 
+  Menu, 
+  X, 
+  Swords, 
+  Database,
+  UserPlus
+} from "lucide-react"
+import { NotificationPanel } from "@/components/notifications/notification-panel"
 
 interface DashboardLayoutProps {
   children: React.ReactNode
@@ -24,17 +37,23 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     { href: "/collection", label: "Coleção", icon: Database },
     { href: "/weapons", label: "Armas", icon: Swords },
     { href: "/tournaments", label: "Torneios", icon: Trophy },
+    { href: "/friends", label: "Amigos", icon: UserPlus },
     { href: "/history", label: "Histórico", icon: History },
     { href: "/settings", label: "Configurações", icon: Settings },
   ]
 
   return (
     <div className="min-h-screen bg-background flex">
-      {/* Mobile sidebar toggle */}
-      <div className="lg:hidden fixed top-4 left-4 z-50">
+      {/* Mobile sidebar toggle and notifications */}
+      <div className="lg:hidden fixed top-4 left-4 z-50 flex items-center gap-2">
         <Button variant="outline" size="icon" onClick={() => setSidebarOpen(!sidebarOpen)} className="rounded-full">
           {sidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
         </Button>
+      </div>
+
+      {/* Notifications panel on desktop */}
+      <div className="fixed top-4 right-4 z-50">
+        <NotificationPanel />
       </div>
 
       {/* Sidebar backdrop for mobile */}

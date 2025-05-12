@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, FormEvent } from "react"
-import { useRouter } from "next/navigation"
+import { useState, FormEvent, useEffect } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -10,21 +10,55 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { useAuth } from "@/hooks/use-auth"
 import { useDraft } from "@/hooks/use-draft"
 import { useTeams } from "@/hooks/use-teams"
-import { Shield, Info } from "lucide-react"
+import { useFriends } from "@/hooks/use-friends"
+import { useNotifications } from "@/hooks/use-notifications"
+import { Shield, Info, Users, CheckCircle } from "lucide-react"
 import { supabase } from "@/lib/supabase"
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from "@/components/ui/select"
+import { Suspense } from "react"
 
-export default function CreateDraftPage() {
+// Componente interno que usa searchParams
+function CreateDraftForm() {
+  const searchParams = useSearchParams()
   const router = useRouter()
   const { user, isAuthenticated, isLoading } = useAuth()
   const { createDraft } = useDraft()
   const { getDecks } = useTeams()
+  const { friends } = useFriends()
+  const { createDraftInviteNotification } = useNotifications()
   
   const [selectedDeckId, setSelectedDeckId] = useState<string>("")
   const [opponentId, setOpponentId] = useState<string>("")
+  const [selectedFriendId, setSelectedFriendId] = useState<string>("")
   const [error, setError] = useState<string | null>(null)
   const [isCreating, setIsCreating] = useState(false)
+  const [notificationSent, setNotificationSent] = useState(false)
   
   const decks = getDecks()
+
+  // Verificar se há um oponente na URL
+  useEffect(() => {
+    const opponentFromUrl = searchParams?.get('opponent')
+    if (opponentFromUrl) {
+      setOpponentId(opponentFromUrl)
+    }
+  }, [searchParams])
+  
+  // Quando um amigo é selecionado, preencher o ID do oponente
+  useEffect(() => {
+    if (selectedFriendId) {
+      const friend = friends.find(f => f.id === selectedFriendId)
+      if (friend) {
+        setOpponentId(friend.playerId)
+      }
+    }
+  }, [selectedFriendId, friends])
   
   // Verificar se o usuário está logado
   if (isLoading) {
@@ -46,11 +80,13 @@ export default function CreateDraftPage() {
     e.preventDefault()
     setError(null)
     setIsCreating(true)
+    setNotificationSent(false)
     
     try {
       // Verificar se um deck foi selecionado
       if (!selectedDeckId) {
         setError("Por favor, selecione um deck para o torneio")
+        setIsCreating(false)
         return
       }
       
@@ -65,6 +101,7 @@ export default function CreateDraftPage() {
           
         if (error || !data) {
           setError("Oponente não encontrado. Verifique o ID do jogador.")
+          setIsCreating(false)
           return
         }
         
@@ -88,11 +125,20 @@ export default function CreateDraftPage() {
           invite_code: inviteCode
         }])
       
+      // Se um oponente foi especificado, enviar uma notificação
+      if (opponentUserId) {
+        const notificationSent = await createDraftInviteNotification(
+          opponentUserId, 
+          draftId,
+          inviteCode
+        )
+        setNotificationSent(notificationSent)
+      }
+      
       // Redirecionar para a sala de draft
       router.push(`/draft/room/${draftId}`)
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao criar sala de draft")
-    } finally {
       setIsCreating(false)
     }
   }
@@ -107,6 +153,16 @@ export default function CreateDraftPage() {
             <Info className="h-4 w-4" />
             <AlertTitle>Erro</AlertTitle>
             <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+        
+        {notificationSent && (
+          <Alert className="mb-6 bg-green-700 text-white border-green-800">
+            <CheckCircle className="h-4 w-4" />
+            <AlertTitle>Convite Enviado</AlertTitle>
+            <AlertDescription>
+              Uma notificação foi enviada para o oponente.
+            </AlertDescription>
           </Alert>
         )}
         
@@ -165,13 +221,52 @@ export default function CreateDraftPage() {
                 )}
               </div>
               
+              {/* Seleção de amigos */}
+              {friends.length > 0 && (
+                <div className="space-y-2">
+                  <Label htmlFor="friend">Convidar Amigo</Label>
+                  <Select 
+                    value={selectedFriendId} 
+                    onValueChange={setSelectedFriendId}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione um amigo para convidar" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">-- Selecionar amigo --</SelectItem>
+                      {friends.map((friend) => (
+                        <SelectItem key={friend.id} value={friend.id}>
+                          {friend.name} {friend.online && '(Online)'}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <div className="flex items-center justify-between text-sm text-muted-foreground">
+                    <p>Ou digite um ID manualmente</p>
+                    <Button
+                      type="button"
+                      variant="link"
+                      size="sm"
+                      className="h-auto p-0"
+                      onClick={() => router.push('/friends')}
+                    >
+                      <Users className="h-3.5 w-3.5 mr-1.5" />
+                      Gerenciar Amigos
+                    </Button>
+                  </div>
+                </div>
+              )}
+              
               <div className="space-y-2">
-                <Label htmlFor="opponentId">Oponente (opcional)</Label>
+                <Label htmlFor="opponentId">ID do Oponente</Label>
                 <Input
                   id="opponentId"
                   placeholder="Digite o ID do oponente"
                   value={opponentId}
-                  onChange={(e) => setOpponentId(e.target.value)}
+                  onChange={(e) => {
+                    setOpponentId(e.target.value)
+                    setSelectedFriendId("")
+                  }}
                 />
                 <p className="text-sm text-muted-foreground">
                   Se não informado, qualquer jogador poderá entrar usando o link da sala.
@@ -224,5 +319,18 @@ export default function CreateDraftPage() {
         )}
       </div>
     </div>
+  )
+}
+
+// Página principal com Suspense para o useSearchParams
+export default function CreateDraftPage() {
+  return (
+    <Suspense fallback={
+      <div className="container py-8 flex justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+      </div>
+    }>
+      <CreateDraftForm />
+    </Suspense>
   )
 }

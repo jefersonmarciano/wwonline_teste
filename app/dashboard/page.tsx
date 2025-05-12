@@ -18,7 +18,8 @@ import {
   KeyRound,
   History,
   Settings,
-  Plus
+  Plus,
+  UserPlus
 } from "lucide-react"
 
 export default function DashboardPage() {
@@ -160,6 +161,29 @@ export default function DashboardPage() {
           </Card>
         ))}
       </div>
+
+      <Card className="hover:shadow-md transition-shadow">
+        <CardHeader className="space-y-1">
+          <CardTitle className="flex items-center gap-2">
+            <UserPlus className="h-5 w-5 text-primary" />
+            <span>Amigos</span>
+          </CardTitle>
+          <CardDescription>Gerencie sua lista de amigos e convites</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm">
+            Adicione amigos para facilitar o convite para salas de draft. Veja quem está online e compartilhe seus decks favoritos.
+          </p>
+        </CardContent>
+        <CardFooter>
+          <Button 
+            className="w-full"
+            onClick={() => router.push("/friends")}
+          >
+            Ver Amigos
+          </Button>
+        </CardFooter>
+      </Card>
 
       {user?.playerId && (
         <div className="mt-8 p-4 bg-muted rounded-md">

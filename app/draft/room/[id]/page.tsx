@@ -7,13 +7,32 @@ import { useCharacters } from "@/hooks/use-characters"
 import { useWeapons } from "@/hooks/use-weapons"
 import { useDraft } from "@/hooks/use-draft"
 import { useTeams } from "@/hooks/use-teams"
+import { useFriends } from "@/hooks/use-friends"
+import { useNotifications } from "@/hooks/use-notifications"
 import { Button } from "@/components/ui/button"
-import { Ban, Shield, Zap, Wind, Flame, Sun, Snowflake, Target, Filter, Loader, KeyRound } from "lucide-react"
+import { Ban, Shield, Zap, Wind, Flame, Sun, Snowflake, Target, Filter, Loader, KeyRound, Users, Share } from "lucide-react"
 import Image from "next/image"
 import { supabase } from "@/lib/supabase"
 import type { Deck } from "@/types/team"
 import type { Character } from "@/types/character"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { 
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter 
+} from "@/components/ui/dialog"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger
+} from "@/components/ui/dropdown-menu"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { toast } from "@/components/ui/use-toast"
 
 export default function DraftRoomPage({ params }: { params: { id: string } }) {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth()
@@ -22,6 +41,8 @@ export default function DraftRoomPage({ params }: { params: { id: string } }) {
   const { weapons } = useWeapons()
   const { teams, getDecks } = useTeams()
   const { draft, isLoading: draftLoading, error, getDraftById, joinDraft, makePick, makeBan } = useDraft()
+  const { friends } = useFriends()
+  const { createDraftInviteNotification } = useNotifications()
 
   // Estado local
   const [selectedDeck, setSelectedDeck] = useState<Deck | null>(null)
@@ -35,6 +56,8 @@ export default function DraftRoomPage({ params }: { params: { id: string } }) {
   const [draftId, setDraftId] = useState<string>("")
   const [inviteCode, setInviteCode] = useState<string>("")
   const [isCopied, setIsCopied] = useState(false)
+  const [inviteFriendsOpen, setInviteFriendsOpen] = useState(false)
+  const [invitingFriend, setInvitingFriend] = useState(false)
 
   // Characters state
   const [availableCharacters, setAvailableCharacters] = useState<Character[]>([])
@@ -480,6 +503,44 @@ export default function DraftRoomPage({ params }: { params: { id: string } }) {
     }
   };
 
+  // Adicionar função para enviar convites
+  const handleInviteFriend = async (friendId: string) => {
+    if (!draft || !inviteCode) return
+    
+    setInvitingFriend(true)
+    
+    try {
+      const notificationSent = await createDraftInviteNotification(
+        friendId, 
+        draft.id,
+        inviteCode
+      )
+      
+      if (notificationSent) {
+        toast({
+          title: "Convite enviado!",
+          description: "O convite foi enviado com sucesso para seu amigo.",
+          variant: "default",
+        })
+      } else {
+        toast({
+          title: "Erro ao enviar convite",
+          description: "Não foi possível enviar o convite.",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("Erro ao convidar amigo:", error)
+      toast({
+        title: "Erro ao enviar convite",
+        description: "Ocorreu um erro ao enviar o convite.",
+        variant: "destructive",
+      })
+    } finally {
+      setInvitingFriend(false)
+    }
+  }
+
   // Mostrar carregamento
   if (authLoading || draftLoading) {
     return (
@@ -835,35 +896,42 @@ export default function DraftRoomPage({ params }: { params: { id: string } }) {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={copyInviteCode}
-                  className={isCopied ? "bg-green-700" : ""}
+                  onClick={() => setInviteFriendsOpen(true)}
                 >
-                  {isCopied ? "Copiado!" : "Copiar"}
+                  <Users className="h-4 w-4 mr-1.5" />
+                  Convidar
                 </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    const url = `${window.location.origin}/draft/join?code=${inviteCode}`;
-                    navigator.clipboard.writeText(url);
-                    setIsCopied(true);
-                    setTimeout(() => setIsCopied(false), 2000);
-                  }}
-                  className="bg-blue-900/20"
-                >
-                  Copiar Link
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    const url = `https://wa.me/?text=Entre%20no%20meu%20draft%20com%20o%20código:%20${inviteCode}%20ou%20pelo%20link:%20${encodeURIComponent(`${window.location.origin}/draft/join?code=${inviteCode}`)}`;
-                    window.open(url, '_blank');
-                  }}
-                  className="bg-green-900/20"
-                >
-                  WhatsApp
-                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm">
+                      <Share className="h-4 w-4 mr-1.5" />
+                      Compartilhar
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent>
+                    <DropdownMenuItem onClick={copyInviteCode}>
+                      Copiar Código
+                    </DropdownMenuItem>
+                    <DropdownMenuItem 
+                      onClick={() => {
+                        const url = `${window.location.origin}/draft/join?code=${inviteCode}`;
+                        navigator.clipboard.writeText(url);
+                        setIsCopied(true);
+                        setTimeout(() => setIsCopied(false), 2000);
+                      }}
+                    >
+                      Copiar Link
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => {
+                        const url = `https://wa.me/?text=Entre%20no%20meu%20draft%20com%20o%20código:%20${inviteCode}%20ou%20pelo%20link:%20${encodeURIComponent(`${window.location.origin}/draft/join?code=${inviteCode}`)}`;
+                        window.open(url, '_blank');
+                      }}
+                    >
+                      Compartilhar no WhatsApp
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             </div>
           )}
@@ -1141,6 +1209,76 @@ export default function DraftRoomPage({ params }: { params: { id: string } }) {
           </div>
         </div>
       </div>
+
+      {/* Modal de convite para amigos */}
+      <Dialog open={inviteFriendsOpen} onOpenChange={setInviteFriendsOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Convidar Amigos</DialogTitle>
+            <DialogDescription>
+              Selecione um amigo para enviar um convite para esta sala.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="py-4">
+            {friends.length === 0 ? (
+              <div className="text-center py-4">
+                <Users className="h-10 w-10 mx-auto mb-2 text-muted-foreground opacity-20" />
+                <p className="text-muted-foreground mb-2">Você ainda não tem amigos na sua lista.</p>
+                <Button size="sm" variant="outline" onClick={() => router.push('/friends')}>
+                  Gerenciar Amigos
+                </Button>
+              </div>
+            ) : (
+              <ScrollArea className="h-60">
+                <ul className="divide-y">
+                  {friends.map((friend) => (
+                    <li key={friend.id} className="py-2 flex justify-between items-center">
+                      <div className="flex items-center gap-3">
+                        <div className="relative">
+                          <Avatar>
+                            <AvatarFallback>
+                              {friend.name.substring(0, 2).toUpperCase()}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div 
+                            className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-background ${
+                              friend.online ? 'bg-green-500' : 'bg-gray-400'
+                            }`}
+                          ></div>
+                        </div>
+                        <div>
+                          <p className="font-medium">{friend.name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {friend.online ? 'Online agora' : 'Offline'}
+                          </p>
+                        </div>
+                      </div>
+                      <Button 
+                        size="sm"
+                        variant="outline"
+                        disabled={invitingFriend}
+                        onClick={() => handleInviteFriend(friend.id.split('|')[1])}
+                      >
+                        Convidar
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              </ScrollArea>
+            )}
+          </div>
+          
+          <DialogFooter className="flex justify-between">
+            <Button variant="outline" onClick={() => setInviteFriendsOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={() => router.push('/friends')}>
+              Gerenciar Amigos
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
