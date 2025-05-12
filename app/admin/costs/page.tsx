@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { useCosts } from "@/hooks/use-costs"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -17,7 +17,7 @@ import { AlertCircle, Save, RotateCcw, Filter } from "lucide-react"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 
 export default function CostsAdminPage() {
-  const { isAuthenticated, user } = useAuth()
+  const { isAuthenticated, user, isLoading } = useAuth()
   const router = useRouter()
   const {
     characterCosts,
@@ -35,9 +35,20 @@ export default function CostsAdminPage() {
   const [isEditing, setIsEditing] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
 
-  // Verificar autenticação
+  // Verificar autenticação usando useEffect para client-side
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      router.push("/login")
+    }
+  }, [isAuthenticated, isLoading, router])
+
+  // Mostrar loading durante verificação
+  if (isLoading) {
+    return <div className="p-6">Carregando...</div>
+  }
+
+  // Se não estiver autenticado, não renderizar o conteúdo
   if (!isAuthenticated) {
-    router.push("/login")
     return null
   }
 

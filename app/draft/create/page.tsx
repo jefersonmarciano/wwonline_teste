@@ -74,6 +74,9 @@ export default function CreateDraftPage() {
       // Criar o draft
       const draftId = await createDraft(opponentUserId)
       
+      // Gerar um código de convite aleatório
+      const inviteCode = Math.random().toString(36).substring(2, 8).toUpperCase()
+      
       // Salvar informações adicionais sobre o draft
       await supabase
         .from('draft_details')
@@ -81,7 +84,8 @@ export default function CreateDraftPage() {
           draft_id: draftId,
           player1_deck_id: selectedDeckId,
           player2_deck_id: null,
-          status: 'waiting' // Esperando oponente
+          status: 'waiting', // Esperando oponente
+          invite_code: inviteCode
         }])
       
       // Redirecionar para a sala de draft

@@ -1,132 +1,179 @@
 "use client"
 
-import { useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { useAuth } from "@/hooks/use-auth"
-import DashboardLayout from "@/components/layouts/dashboard-layout"
-import { PlusCircle, Users, Trophy, History } from "lucide-react"
-import Link from "next/link"
+import { Button } from "@/components/ui/button"
+import { 
+  Card, 
+  CardContent, 
+  CardDescription, 
+  CardFooter, 
+  CardHeader, 
+  CardTitle 
+} from "@/components/ui/card"
+import { 
+  Gamepad2, 
+  Users, 
+  ShieldPlus,
+  KeyRound,
+  History,
+  Settings,
+  Plus
+} from "lucide-react"
 
 export default function DashboardPage() {
-  const { user, isAuthenticated } = useAuth()
+  const { user, isAuthenticated, isLoading } = useAuth()
   const router = useRouter()
 
-  useEffect(() => {
-    if (!isAuthenticated) {
-      router.push("/login")
-    }
-  }, [isAuthenticated, router])
+  // Verificar se o usuário está autenticado
+  if (isLoading) {
+    return <div className="flex items-center justify-center min-h-screen">Carregando...</div>
+  }
 
   if (!isAuthenticated) {
+    router.push("/login")
     return null
   }
 
+  const features = [
+    {
+      title: "Criar Nova Sala",
+      description: "Inicie um novo draft e convide um oponente",
+      icon: <Gamepad2 className="h-6 w-6" />,
+      action: () => router.push("/draft/create"),
+      variant: "default" as const,
+      priority: true
+    },
+    {
+      title: "Entrar com Código",
+      description: "Use um código de convite para entrar em uma sala",
+      icon: <KeyRound className="h-6 w-6" />,
+      action: () => router.push("/draft/join"),
+      variant: "outline" as const,
+      priority: true
+    },
+    {
+      title: "Histórico de Drafts",
+      description: "Veja seus drafts anteriores e em andamento",
+      icon: <History className="h-6 w-6" />,
+      action: () => router.push("/draft/history"),
+      variant: "outline" as const,
+      priority: false
+    },
+    {
+      title: "Gerenciar Equipes",
+      description: "Crie e edite suas equipes para os drafts",
+      icon: <Users className="h-6 w-6" />,
+      action: () => router.push("/teams"),
+      variant: "outline" as const,
+      priority: false
+    },
+    {
+      title: "Coleção",
+      description: "Gerencie sua coleção de personagens e armas",
+      icon: <ShieldPlus className="h-6 w-6" />,
+      action: () => router.push("/collection"),
+      variant: "outline" as const,
+      priority: false
+    },
+    {
+      title: "Configurações",
+      description: "Ajuste suas preferências e informações de perfil",
+      icon: <Settings className="h-6 w-6" />,
+      action: () => router.push("/settings"),
+      variant: "outline" as const,
+      priority: false
+    }
+  ]
+
+  // Filtrar as funcionalidades prioritárias
+  const priorityFeatures = features.filter(f => f.priority)
+  const otherFeatures = features.filter(f => !f.priority)
+
   return (
-    <DashboardLayout>
-      <div className="p-6">
-        <h1 className="text-3xl font-bold mb-6">Dashboard</h1>
+    <div className="container mx-auto py-8 px-4">
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold">Bem-vindo, {user?.name}</h1>
+        <p className="text-muted-foreground">
+          O que você gostaria de fazer hoje?
+        </p>
+      </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Total de Personagens</CardTitle>
+      {/* Ações principais */}
+      <div className="flex flex-col md:flex-row gap-4 mb-10">
+        {priorityFeatures.map((feature, index) => (
+          <Card 
+            key={index} 
+            className={`flex-1 overflow-hidden border-2 ${feature.title === "Entrar com Código" ? "border-blue-500 shadow-md shadow-blue-500/20" : "border-primary"}`}
+          >
+            <CardHeader className={`pb-2 ${feature.title === "Entrar com Código" ? "bg-blue-500/10" : ""}`}>
+              <CardTitle className="flex items-center gap-2">
+                {feature.icon}
+                {feature.title}
+              </CardTitle>
+              <CardDescription>{feature.description}</CardDescription>
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">32</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Personagens 5★</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">18</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Personagens 4★</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">14</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Armas Disponíveis</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">24</div>
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Ações Rápidas</CardTitle>
-              <CardDescription>Gerencie suas atividades no sistema</CardDescription>
-            </CardHeader>
-            <CardContent className="grid gap-4">
-              <Button className="w-full justify-start" asChild>
-                <Link href="/draft/create">
-                  <PlusCircle className="mr-2 h-4 w-4" />
-                  Criar Nova Sala de Draft
-                </Link>
-              </Button>
-              <Button className="w-full justify-start" variant="outline" asChild>
-                <Link href="/teams">
-                  <Users className="mr-2 h-4 w-4" />
-                  Gerenciar Times
-                </Link>
-              </Button>
-              <Button className="w-full justify-start" variant="outline" asChild>
-                <Link href="/tournaments">
-                  <Trophy className="mr-2 h-4 w-4" />
-                  Ver Torneios
-                </Link>
-              </Button>
-              <Button className="w-full justify-start" variant="outline" asChild>
-                <Link href="/history">
-                  <History className="mr-2 h-4 w-4" />
-                  Histórico de Partidas
-                </Link>
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Meu Perfil</CardTitle>
-              <CardDescription>Informações da sua conta</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <div className="text-sm font-medium text-muted-foreground">Nome</div>
-                <div>{user?.name || "Usuário"}</div>
-              </div>
-              <div>
-                <div className="text-sm font-medium text-muted-foreground">Email</div>
-                <div>{user?.email || "email@exemplo.com"}</div>
-              </div>
-              <div>
-                <div className="text-sm font-medium text-muted-foreground">Status da Conta</div>
-                <div className="flex items-center">
-                  <span className="h-2 w-2 rounded-full bg-green-500 mr-2"></span>
-                  Ativo
-                </div>
-              </div>
-            </CardContent>
-            <CardFooter>
-              <Button variant="outline" className="w-full" asChild>
-                <Link href="/profile">Editar Perfil</Link>
+            <CardFooter className="pt-2">
+              <Button 
+                variant={feature.title === "Entrar com Código" ? "default" : feature.variant} 
+                className="w-full" 
+                onClick={feature.action}
+              >
+                {feature.title === "Criar Nova Sala" ? (
+                  <div className="flex items-center gap-2">
+                    <Plus className="h-4 w-4" />
+                    <span>Criar Agora</span>
+                  </div>
+                ) : feature.title === "Entrar com Código" ? (
+                  <div className="flex items-center gap-2">
+                    <KeyRound className="h-4 w-4" />
+                    <span>Entrar com Código</span>
+                  </div>
+                ) : "Acessar"}
               </Button>
             </CardFooter>
           </Card>
-        </div>
+        ))}
       </div>
-    </DashboardLayout>
+
+      {/* Outras funcionalidades */}
+      <h2 className="text-xl font-medium mb-4">Outras funcionalidades</h2>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {otherFeatures.map((feature, index) => (
+          <Card key={index} className="overflow-hidden">
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center gap-2 text-lg">
+                {feature.icon}
+                {feature.title}
+              </CardTitle>
+              <CardDescription>{feature.description}</CardDescription>
+            </CardHeader>
+            <CardFooter className="pt-2">
+              <Button 
+                variant={feature.variant} 
+                className="w-full" 
+                onClick={feature.action}
+              >
+                Acessar
+              </Button>
+            </CardFooter>
+          </Card>
+        ))}
+      </div>
+
+      {user?.playerId && (
+        <div className="mt-8 p-4 bg-muted rounded-md">
+          <p className="text-sm flex items-center gap-2">
+            <KeyRound className="h-4 w-4 text-blue-500" />
+            <span>
+              <span className="font-medium">Seu ID de jogador:</span> {user.playerId}
+            </span>
+          </p>
+          <p className="text-xs text-muted-foreground mt-1 ml-6">
+            Compartilhe este ID com outros jogadores para que eles possam te convidar para drafts.
+          </p>
+        </div>
+      )}
+    </div>
   )
 }

@@ -8,7 +8,7 @@ import { useWeapons } from "@/hooks/use-weapons"
 import { useDraft } from "@/hooks/use-draft"
 import { useTeams } from "@/hooks/use-teams"
 import { Button } from "@/components/ui/button"
-import { Ban, Shield, Zap, Wind, Flame, Sun, Snowflake, Target, Filter, Loader } from "lucide-react"
+import { Ban, Shield, Zap, Wind, Flame, Sun, Snowflake, Target, Filter, Loader, KeyRound } from "lucide-react"
 import Image from "next/image"
 import { supabase } from "@/lib/supabase"
 import type { Deck } from "@/types/team"
@@ -33,6 +33,8 @@ export default function DraftRoomPage({ params }: { params: { id: string } }) {
   const [activeFilterOpponent, setActiveFilterOpponent] = useState<string | null>(null)
   const [fetchError, setFetchError] = useState<string | null>(null)
   const [draftId, setDraftId] = useState<string>("")
+  const [inviteCode, setInviteCode] = useState<string>("")
+  const [isCopied, setIsCopied] = useState(false)
 
   // Characters state
   const [availableCharacters, setAvailableCharacters] = useState<Character[]>([])
@@ -144,6 +146,11 @@ export default function DraftRoomPage({ params }: { params: { id: string } }) {
             .single();
             
           if (draftDetails) {
+            // Salvar o código de convite
+            if (draftDetails.invite_code) {
+              setInviteCode(draftDetails.invite_code);
+            }
+            
             // Carregar deck do jogador
             const playerDeckId = isPlayer1 ? draftDetails.player1_deck_id : draftDetails.player2_deck_id;
             const opponentDeckId = isPlayer1 ? draftDetails.player2_deck_id : draftDetails.player1_deck_id;
@@ -463,6 +470,15 @@ export default function DraftRoomPage({ params }: { params: { id: string } }) {
   const filteredCharactersOpponent = activeFilterOpponent
     ? availableCharactersOpponent.filter((char) => char.element === activeFilterOpponent)
     : availableCharactersOpponent
+
+  // Função para copiar o código de convite
+  const copyInviteCode = () => {
+    if (navigator.clipboard && inviteCode) {
+      navigator.clipboard.writeText(inviteCode);
+      setIsCopied(true);
+      setTimeout(() => setIsCopied(false), 2000);
+    }
+  };
 
   // Mostrar carregamento
   if (authLoading || draftLoading) {
@@ -809,6 +825,49 @@ export default function DraftRoomPage({ params }: { params: { id: string } }) {
         <div className="text-white text-lg">{renderPhaseMessage()}</div>
 
         <div className="flex gap-2">
+          {inviteCode && (
+            <div className="flex items-center gap-2">
+              <div className="bg-gray-800 px-3 py-1 rounded-md flex items-center">
+                <KeyRound className="h-4 w-4 text-primary mr-2" />
+                <span className="text-sm font-mono">{inviteCode}</span>
+              </div>
+              <div className="flex gap-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={copyInviteCode}
+                  className={isCopied ? "bg-green-700" : ""}
+                >
+                  {isCopied ? "Copiado!" : "Copiar"}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const url = `${window.location.origin}/draft/join?code=${inviteCode}`;
+                    navigator.clipboard.writeText(url);
+                    setIsCopied(true);
+                    setTimeout(() => setIsCopied(false), 2000);
+                  }}
+                  className="bg-blue-900/20"
+                >
+                  Copiar Link
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const url = `https://wa.me/?text=Entre%20no%20meu%20draft%20com%20o%20código:%20${inviteCode}%20ou%20pelo%20link:%20${encodeURIComponent(`${window.location.origin}/draft/join?code=${inviteCode}`)}`;
+                    window.open(url, '_blank');
+                  }}
+                  className="bg-green-900/20"
+                >
+                  WhatsApp
+                </Button>
+              </div>
+            </div>
+          )}
+          
           {draft?.completed && (
             <Button 
               variant="default"

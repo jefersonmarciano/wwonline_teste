@@ -1,8 +1,7 @@
 "use client"
 
 import type React from "react"
-
-import { useState, useEffect } from "react"
+import { useState, useEffect, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -14,7 +13,7 @@ import Link from "next/link"
 import { useAuth } from "@/hooks/use-auth"
 import { signInForTesting } from "@/lib/supabase"
 
-export default function LoginPage() {
+function LoginForm() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [isLoading, setIsLoading] = useState(false)
@@ -84,76 +83,84 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-gray-900 to-gray-800 p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle className="text-2xl">Login</CardTitle>
-          <CardDescription>Entre com sua conta para acessar o sistema de pick e ban</CardDescription>
-        </CardHeader>
-        <form onSubmit={handleSubmit}>
-          <CardContent className="space-y-4">
-            {error && (
-              <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertTitle>Erro</AlertTitle>
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
-            
-            {success && (
-              <Alert className="bg-green-700 text-white border-green-800">
-                <CheckCircle className="h-4 w-4" />
-                <AlertTitle>Sucesso</AlertTitle>
-                <AlertDescription>{success}</AlertDescription>
-              </Alert>
-            )}
+    <Card className="w-full max-w-md">
+      <CardHeader>
+        <CardTitle className="text-2xl">Login</CardTitle>
+        <CardDescription>Entre com sua conta para acessar o sistema de pick e ban</CardDescription>
+      </CardHeader>
+      <form onSubmit={handleSubmit}>
+        <CardContent className="space-y-4">
+          {error && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Erro</AlertTitle>
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
           
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="seu@email.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Senha</Label>
-              <Input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
-            </div>
-          </CardContent>
-          <CardFooter className="flex flex-col space-y-4">
-            <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? "Entrando..." : "Entrar"}
-            </Button>
-            
-            <Button 
-              type="button" 
-              variant="outline" 
-              className="w-full mt-2" 
-              onClick={handleTestLogin}
-              disabled={isLoading}
-            >
-              Entrar para teste (sem cadastro)
-            </Button>
-            
-            <div className="text-center text-sm">
-              Não tem uma conta?{" "}
-              <Link href="/register" className="text-primary hover:underline">
-                Registre-se
-              </Link>
-            </div>
-          </CardFooter>
-        </form>
-      </Card>
+          {success && (
+            <Alert className="bg-green-700 text-white border-green-800">
+              <CheckCircle className="h-4 w-4" />
+              <AlertTitle>Sucesso</AlertTitle>
+              <AlertDescription>{success}</AlertDescription>
+            </Alert>
+          )}
+        
+          <div className="space-y-2">
+            <Label htmlFor="email">Email</Label>
+            <Input
+              id="email"
+              type="email"
+              placeholder="seu@email.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="password">Senha</Label>
+            <Input
+              id="password"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+          </div>
+        </CardContent>
+        <CardFooter className="flex flex-col space-y-4">
+          <Button type="submit" className="w-full" disabled={isLoading}>
+            {isLoading ? "Entrando..." : "Entrar"}
+          </Button>
+          
+          <Button 
+            type="button" 
+            variant="outline" 
+            className="w-full mt-2" 
+            onClick={handleTestLogin}
+            disabled={isLoading}
+          >
+            Entrar para teste (sem cadastro)
+          </Button>
+          
+          <div className="text-center text-sm">
+            Não tem uma conta?{" "}
+            <Link href="/register" className="text-primary hover:underline">
+              Registre-se
+            </Link>
+          </div>
+        </CardFooter>
+      </form>
+    </Card>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-gray-900 to-gray-800 p-4">
+      <Suspense fallback={<div>Carregando...</div>}>
+        <LoginForm />
+      </Suspense>
     </div>
   )
 }

@@ -9,14 +9,25 @@ import { useCosts } from "@/hooks/use-costs"
 import { useAuth } from "@/hooks/use-auth"
 import DashboardLayout from "@/components/layouts/dashboard-layout"
 import { FileText, Shield, Swords, Award } from "lucide-react"
+import { useEffect } from "react"
 
 export default function DraftRulesPage() {
-  const { isAuthenticated } = useAuth()
+  const { isAuthenticated, isLoading } = useAuth()
   const router = useRouter()
   const { characterCosts, weaponCosts, draftRules } = useCosts()
 
+  // Usamos useEffect para realizar o redirecionamento no cliente
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      router.push("/login")
+    }
+  }, [isAuthenticated, isLoading, router])
+
+  if (isLoading) {
+    return <div className="p-6">Carregando...</div>
+  }
+
   if (!isAuthenticated) {
-    router.push("/login")
     return null
   }
 
