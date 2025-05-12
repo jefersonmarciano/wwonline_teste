@@ -2,6 +2,7 @@
 
 import type React from "react"
 import { createContext, useContext, useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { 
   supabase, 
   signInWithEmail, 
@@ -43,86 +44,134 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
+  const router = useRouter()
 
-  // Verificar autenticação no carregamento inicial
+  // Verificar autenticação no carregamento inicial - versão simplificada
   useEffect(() => {
     const checkAuth = async () => {
       try {
         setIsLoading(true)
-        const authenticated = await isUserAuthenticated()
+        console.log("🔍 [Auth] Verificando autenticação inicial simplificada...")
         
-        if (authenticated) {
-          const supabaseUser = await getCurrentUser()
-          
-          if (supabaseUser) {
-            // Buscar o perfil do usuário
-            const { data: profile, error } = await getProfile(supabaseUser.id)
+        const { data, error } = await supabase.auth.getSession()
+        
+        if (error) {
+          console.error("❌ [Auth] Erro ao verificar sessão:", error)
+          setIsAuthenticated(false)
+          setUser(null)
+          return
+        }
+        
+        // Se não há sessão, usuário não está autenticado
+        if (!data.session) {
+          console.log("🔍 [Auth] Nenhuma sessão encontrada, usuário não autenticado")
+          setIsAuthenticated(false)
+          setUser(null)
+          return
+        }
+        
+        console.log("✅ [Auth] Sessão encontrada, buscando usuário...")
+        
+        // Sessão existe, buscar detalhes do usuário
+        const { user: supabaseUser } = data.session
+        
+        if (supabaseUser) {
+          // Buscar o perfil do usuário
+          try {
+            const { data: profile, error: profileError } = await getProfile(supabaseUser.id)
+            
+            if (profileError) {
+              console.error("❌ [Auth] Erro ao buscar perfil:", profileError)
+            }
             
             if (profile) {
-              setUser({
+              const userData = {
                 id: supabaseUser.id,
                 email: supabaseUser.email || '',
                 name: profile.name || supabaseUser.email?.split('@')[0] || 'Usuário',
                 playerId: profile.player_id
-              })
+              }
+              
+              setUser(userData)
               setIsAuthenticated(true)
+              console.log("✅ [Auth] Usuário autenticado com sucesso:", userData.email)
             }
+          } catch (profileError) {
+            console.error("❌ [Auth] Erro ao buscar perfil:", profileError)
           }
         }
       } catch (error) {
-        console.error("Erro ao verificar autenticação:", error)
+        console.error("❌ [Auth] Erro ao verificar autenticação:", error)
       } finally {
         setIsLoading(false)
       }
     }
 
     checkAuth()
-
-    // Configurar listener para mudanças de autenticação
+    
+    // Configurar listener básico para mudanças de autenticação
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        console.log("🔍 [Auth] Evento de autenticação:", event)
+        
         if (event === 'SIGNED_IN' && session?.user) {
-          // Usuário acabou de fazer login
-          const { data: profile } = await getProfile(session.user.id)
-          
-          setUser({
-            id: session.user.id,
-            email: session.user.email || '',
-            name: profile?.name || session.user.email?.split('@')[0] || 'Usuário',
-            playerId: profile?.player_id
-          })
-          setIsAuthenticated(true)
+          try {
+            const { data: profile } = await getProfile(session.user.id)
+            
+            const userData = {
+              id: session.user.id,
+              email: session.user.email || '',
+              name: profile?.name || session.user.email?.split('@')[0] || 'Usuário',
+              playerId: profile?.player_id
+            }
+            
+            setUser(userData)
+            setIsAuthenticated(true)
+            
+            // Navegar para dashboard de forma simples
+            if (window.location.pathname === '/login') {
+              router.push('/dashboard')
+            }
+          } catch (error) {
+            console.error("❌ [Auth] Erro ao processar login:", error)
+          }
         } else if (event === 'SIGNED_OUT') {
-          // Usuário acabou de fazer logout
           setUser(null)
           setIsAuthenticated(false)
+          
+          // Navegar para login de forma simples
+          if (window.location.pathname !== '/login' && window.location.pathname !== '/register') {
+            router.push('/login')
+          }
         }
       }
     )
 
     return () => {
-      // Remover listener ao desmontar
       authListener.subscription.unsubscribe()
     }
-  }, [])
+  }, [router])
 
-  // Função de login
+  // Função de login simplificada
   const login = async (email: string, password: string) => {
     try {
       const { data, error } = await signInWithEmail(email, password)
       
       if (error) {
-        // Mensagem mais amigável para erro de credenciais inválidas
         if (error.message.includes("Invalid login credentials")) {
           return { success: false, error: "Email ou senha incorretos. Por favor, verifique suas credenciais." }
         }
         return { success: false, error: error.message }
       }
       
-      // Se o login for bem-sucedido, o listener vai atualizar o estado
+      // Após login bem-sucedido, redirecionar para o dashboard
+      if (data.user) {
+        router.push('/dashboard')
+      }
+      
       return { success: true }
     } catch (error) {
-      console.error("Erro ao fazer login:", error)
+      console.error("❌ [Auth] Erro ao fazer login:", error)
       return { 
         success: false, 
         error: error instanceof Error ? error.message : "Erro desconhecido ao fazer login" 
@@ -133,11 +182,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Função de registro
   const register = async (email: string, password: string, name: string) => {
     try {
-      // Registrar o usuário
       const { data, error } = await signUpWithEmail(email, password, { name })
       
       if (error) {
-        // Mensagem mais amigável para erro de usuário já registrado
         if (error.message.includes("already registered")) {
           return { success: false, error: "Este email já está registrado. Por favor, faça login ou use outro email." }
         }
@@ -161,7 +208,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       return { success: true }
     } catch (error) {
-      console.error("Erro ao registrar:", error)
+      console.error("❌ [Auth] Erro ao registrar:", error)
       return { 
         success: false, 
         error: error instanceof Error ? error.message : "Erro desconhecido ao registrar" 
@@ -169,13 +216,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  // Função de logout
+  // Função de logout simplificada
   const logout = async () => {
     try {
       await signOut()
-      // O listener vai atualizar o estado
+      router.push('/login')
     } catch (error) {
-      console.error("Erro ao fazer logout:", error)
+      console.error("❌ [Auth] Erro ao fazer logout:", error)
     }
   }
 
@@ -208,7 +255,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       return { success: true }
     } catch (error) {
-      console.error("Erro ao atualizar perfil:", error)
+      console.error("❌ [Auth] Erro ao atualizar perfil:", error)
       return { 
         success: false, 
         error: error instanceof Error ? error.message : "Erro desconhecido ao atualizar perfil" 
@@ -225,7 +272,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         login, 
         register,
         logout,
-        updateUserProfile 
+        updateUserProfile
       }}
     >
       {children}

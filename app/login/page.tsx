@@ -13,6 +13,7 @@ import Link from "next/link"
 import { useAuth } from "@/hooks/use-auth"
 import { signInForTesting } from "@/lib/supabase"
 
+// Componente interno que usa useSearchParams
 function LoginForm() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -23,19 +24,20 @@ function LoginForm() {
   const searchParams = useSearchParams()
   const { login, isAuthenticated } = useAuth()
 
+  // Verificar se o usuário já está autenticado
+  useEffect(() => {
+    if (isAuthenticated) {
+      console.log("Usuário já autenticado, redirecionando para dashboard")
+      router.push('/dashboard')
+    }
+  }, [isAuthenticated, router])
+
   // Verificar se o usuário foi redirecionado após o registro
   useEffect(() => {
     if (searchParams.get('registered') === 'true') {
       setSuccess('Conta criada com sucesso! Faça login para continuar.')
     }
   }, [searchParams])
-
-  // Redirecionar se já estiver autenticado
-  useEffect(() => {
-    if (isAuthenticated) {
-      router.push('/dashboard')
-    }
-  }, [isAuthenticated, router])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -48,7 +50,8 @@ function LoginForm() {
       const result = await login(email, password)
       
       if (result.success) {
-        // Sucesso - o redirecionamento será tratado pelo useEffect acima
+        setSuccess("Login realizado com sucesso! Redirecionando...")
+        // Não é necessário redirecionar aqui, o hook useAuth já cuida disso
       } else {
         setError(result.error || "Erro ao fazer login")
       }
@@ -72,7 +75,8 @@ function LoginForm() {
       if (response.error) {
         setError("Erro ao fazer login de teste: " + response.error.message)
       } else {
-        // O hook useAuth detectará a alteração e redirecionará o usuário
+        setSuccess("Login de teste realizado com sucesso! Redirecionando...")
+        // O redirecionamento será feito pelo listener de autenticação
       }
     } catch (error) {
       console.error("Erro ao fazer login de teste:", error)
@@ -155,6 +159,7 @@ function LoginForm() {
   )
 }
 
+// Componente principal que envolve LoginForm em um Suspense boundary
 export default function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-gray-900 to-gray-800 p-4">
