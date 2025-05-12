@@ -22,7 +22,7 @@ interface FriendRequest {
   receiverName?: string
   receiverPlayerId?: string
   status: 'pending' | 'accepted' | 'rejected'
-  createdAt: string
+  created_at: string
 }
 
 interface FriendsContextType {
@@ -133,7 +133,7 @@ export function FriendsProvider({ children }: { children: React.ReactNode }) {
         senderPlayerId: item.sender.player_id,
         receiverId: item.receiver_id,
         status: item.status,
-        createdAt: item.created_at
+        created_at: item.created_at
       }))
 
       // Formatar solicitações enviadas
@@ -144,7 +144,7 @@ export function FriendsProvider({ children }: { children: React.ReactNode }) {
         receiverName: item.receiver.name,
         receiverPlayerId: item.receiver.player_id,
         status: item.status,
-        createdAt: item.created_at
+        created_at: item.created_at
       }))
 
       setFriends(formattedFriends)

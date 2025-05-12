@@ -141,8 +141,8 @@ export function DraftProvider({ children }: { children: React.ReactNode }) {
           maxBans: settings.maxBans,
           completed: false,
           winner: null,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
         }
 
         // Salvar no Supabase
@@ -208,7 +208,7 @@ export function DraftProvider({ children }: { children: React.ReactNode }) {
                 characters: [],
                 bans: []
               },
-              updatedAt: new Date().toISOString()
+              updated_at: new Date().toISOString()
             })
             .eq('id', draftId)
 
@@ -287,7 +287,7 @@ export function DraftProvider({ children }: { children: React.ReactNode }) {
           currentPick: nextCurrentPick,
           phase: nextPhase,
           completed,
-          updatedAt: new Date().toISOString()
+          updated_at: new Date().toISOString()
         }
 
         // Atualizar no Supabase
@@ -358,7 +358,7 @@ export function DraftProvider({ children }: { children: React.ReactNode }) {
         }
         
         updates.turn = nextTurn
-        updates.updatedAt = new Date().toISOString()
+        updates.updated_at = new Date().toISOString()
 
         // Atualizar no Supabase
         const { error } = await supabase
@@ -387,7 +387,7 @@ export function DraftProvider({ children }: { children: React.ReactNode }) {
     try {
       const updates = {
         ...updatedDraft,
-        updatedAt: new Date().toISOString()
+        updated_at: new Date().toISOString()
       }
 
       // Atualizar no Supabase
@@ -444,7 +444,7 @@ export function DraftProvider({ children }: { children: React.ReactNode }) {
         .from('drafts')
         .select('*')
         .or(`player1->>id.eq.${user.id},player2->>id.eq.${user.id}`)
-        .order('createdAt', { ascending: false })
+        .order('created_at', { ascending: false })
 
       if (error) {
         throw error

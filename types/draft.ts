@@ -23,8 +23,8 @@ export type DraftState = {
   maxBans: number
   completed: boolean
   winner: string | null
-  createdAt?: string
-  updatedAt?: string
+  created_at?: string
+  updated_at?: string
 }
 
 export type DraftSettings = {

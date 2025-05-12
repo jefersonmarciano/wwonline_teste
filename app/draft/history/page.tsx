@@ -108,7 +108,7 @@ export default function DraftHistoryPage() {
                   </div>
                   <div className="text-sm text-muted-foreground flex items-center mt-2">
                     <Clock className="h-4 w-4 mr-1" />
-                    {formatDate(draft.createdAt)}
+                    {formatDate(draft.created_at)}
                   </div>
                 </CardHeader>
                 

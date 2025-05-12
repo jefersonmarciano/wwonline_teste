@@ -390,7 +390,7 @@ export default function FriendsPage() {
                             </div>
                           </div>
                           <p className="text-xs text-muted-foreground">
-                            {formatLastActive(request.createdAt)}
+                            {formatLastActive(request.created_at)}
                           </p>
                         </div>
                         <div className="flex justify-end gap-2 mt-2">
@@ -460,7 +460,7 @@ export default function FriendsPage() {
                           </div>
                           <div className="flex items-center gap-4">
                             <p className="text-xs text-muted-foreground">
-                              {formatLastActive(request.createdAt)}
+                              {formatLastActive(request.created_at)}
                             </p>
                             <Button
                               variant="ghost"

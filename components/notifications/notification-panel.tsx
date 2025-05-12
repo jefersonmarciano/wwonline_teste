@@ -134,7 +134,7 @@ export function NotificationPanel() {
                         {notification.message}
                       </p>
                       <div className="text-xs text-muted-foreground mt-1">
-                        {new Date(notification.createdAt).toLocaleString("pt-BR", {
+                        {new Date(notification.created_at).toLocaleString("pt-BR", {
                           day: "2-digit",
                           month: "2-digit",
                           hour: "2-digit",

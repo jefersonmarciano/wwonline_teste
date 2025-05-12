@@ -14,7 +14,7 @@ export interface Notification {
   relatedId?: string // draft_id, friend_request_id, etc.
   senderId?: string
   read: boolean
-  createdAt: string
+  created_at: string
 }
 
 interface NotificationsContextType {
@@ -74,7 +74,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
         relatedId: item.related_id,
         senderId: item.sender_id,
         read: item.read,
-        createdAt: item.created_at
+        created_at: item.created_at
       }))
 
       setNotifications(formattedNotifications)
