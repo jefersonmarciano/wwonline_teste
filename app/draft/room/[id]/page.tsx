@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState, useRef } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useRouter } from "next/navigation"
 import { useAuth } from "@/hooks/use-auth"
 import { useCharacters } from "@/hooks/use-characters"
 import { useWeapons } from "@/hooks/use-weapons"
