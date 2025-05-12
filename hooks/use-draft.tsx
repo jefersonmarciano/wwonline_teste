@@ -145,10 +145,18 @@ export function DraftProvider({ children }: { children: React.ReactNode }) {
           updated_at: new Date().toISOString(),
         }
 
+        // Preparar objeto para salvar no Supabase com snake_case para a coluna currentPick
+        const dbDraft = {
+          ...newDraft,
+          current_pick: newDraft.currentPick, // Adicionar campo com nome em snake_case
+          // Remove camelCase field to avoid duplication
+          currentPick: undefined
+        };
+
         // Salvar no Supabase
         const { error: saveError } = await supabase
           .from('drafts')
-          .insert([newDraft])
+          .insert([dbDraft])
 
         if (saveError) {
           throw new Error(`Erro ao salvar draft: ${saveError.message}`)
@@ -278,29 +286,40 @@ export function DraftProvider({ children }: { children: React.ReactNode }) {
           nextPhase = "ban"
         }
 
-        // Verificar se o draft está completo (após 16 seleções)
-        const completed = nextCurrentPick > 8
-
-        const updates = {
+        // Verificar se o draft foi concluído
+        const isPickingCompleted = nextCurrentPick === draft.maxPicks && nextTurn === "player1"
+        
+        // Atualizar no Supabase
+        const updateData = {
           picks: updatedPicks,
           turn: nextTurn,
-          currentPick: nextCurrentPick,
-          phase: nextPhase,
-          completed,
+          current_pick: nextCurrentPick, // Usar snake_case aqui
+          phase: isPickingCompleted ? "complete" : nextPhase,
+          completed: isPickingCompleted,
           updated_at: new Date().toISOString()
         }
 
-        // Atualizar no Supabase
-        const { error } = await supabase
+        const { error: updateError } = await supabase
           .from('drafts')
-          .update(updates)
+          .update(updateData)
           .eq('id', draft.id)
 
-        if (error) {
-          throw new Error(`Erro ao fazer pick: ${error.message}`)
+        if (updateError) {
+          console.error("Erro ao fazer pick:", updateError)
+          return false
         }
 
-        // O draft será atualizado automaticamente pelo listener em tempo real
+        // Atualizar o estado local
+        setDraft({
+          ...draft,
+          picks: updatedPicks,
+          turn: nextTurn,
+          currentPick: nextCurrentPick,
+          phase: isPickingCompleted ? "complete" : nextPhase,
+          completed: isPickingCompleted,
+          updated_at: new Date().toISOString()
+        })
+
         return true
       } catch (err) {
         console.error("Erro ao fazer pick:", err)
@@ -322,55 +341,59 @@ export function DraftProvider({ children }: { children: React.ReactNode }) {
       const isPlayer2 = draft.player2.id === user.id
       const isCurrentTurn = (isPlayer1 && draft.turn === "player1") || (isPlayer2 && draft.turn === "player2")
 
-      if (!isCurrentTurn || (draft.phase !== "preban" && draft.phase !== "ban")) {
+      if (!isCurrentTurn || draft.phase !== "ban") {
         return false
       }
 
       try {
         const nextTurn = draft.turn === "player1" ? "player2" : "player1"
         
-        let updates: any = {}
+        // Adicionar o personagem aos banimentos do jogador
+        const updatedPlayer = draft.turn === "player1" 
+          ? { ...draft.player1, bans: [...draft.player1.bans, characterId] }
+          : { ...draft.player2, bans: [...draft.player2.bans, characterId] }
         
-        // Determinar o que atualizar com base na fase atual
-        if (draft.phase === "preban") {
-          // Pré-banimentos
-          const updatedPrebans = [...draft.prebans, characterId]
-          updates.prebans = updatedPrebans
-          
-          // Se o player2 completou seus pré-banimentos, vamos para a fase de picks
-          if (nextTurn === "player1" && updatedPrebans.length >= 4) {
-            updates.phase = "pick"
-          }
-        } else {
-          // Banimentos do meio do jogo
-          const playerKey = draft.turn
-          
-          // Atualizar os bans do jogador atual
-          updates[`player${draft.turn === "player1" ? "1" : "2"}`] = {
-            ...draft[playerKey],
-            bans: [...draft[playerKey].bans, characterId]
-          }
-          
-          // Se o player2 fez seu ban do meio, voltar para picks
-          if (nextTurn === "player1") {
-            updates.phase = "pick"
-          }
+        // Mudar de volta para a fase de picks após finalizar os banimentos
+        let nextPhase: DraftPhase = draft.phase
+        
+        // Verificar se já concluímos os banimentos do meio
+        const player1BansCompleted = draft.player1.bans.length === draft.maxBans || 
+                                    (updatedPlayer === draft.player1 && updatedPlayer.bans.length === draft.maxBans)
+        const player2BansCompleted = draft.player2.bans.length === draft.maxBans || 
+                                    (updatedPlayer === draft.player2 && updatedPlayer.bans.length === draft.maxBans)
+        
+        // Voltar para picks quando os dois jogadores concluíram seus banimentos
+        if (player1BansCompleted && player2BansCompleted) {
+          nextPhase = "pick"
         }
         
-        updates.turn = nextTurn
-        updates.updated_at = new Date().toISOString()
-
         // Atualizar no Supabase
-        const { error } = await supabase
+        const updateData = {
+          [draft.turn]: updatedPlayer,
+          turn: nextTurn,
+          phase: nextPhase,
+          updated_at: new Date().toISOString()
+        }
+
+        const { error: updateError } = await supabase
           .from('drafts')
-          .update(updates)
+          .update(updateData)
           .eq('id', draft.id)
 
-        if (error) {
-          throw new Error(`Erro ao fazer ban: ${error.message}`)
+        if (updateError) {
+          console.error("Erro ao fazer ban:", updateError)
+          return false
         }
 
-        // O draft será atualizado automaticamente pelo listener em tempo real
+        // Atualizar o estado local
+        setDraft({
+          ...draft,
+          [draft.turn]: updatedPlayer,
+          turn: nextTurn,
+          phase: nextPhase,
+          updated_at: new Date().toISOString()
+        })
+
         return true
       } catch (err) {
         console.error("Erro ao fazer ban:", err)
@@ -380,82 +403,124 @@ export function DraftProvider({ children }: { children: React.ReactNode }) {
     [draft, user],
   )
 
-  // Atualizar o draft
-  const updateDraft = useCallback(async (updatedDraft: Partial<DraftState>) => {
-    if (!draft) return
-
-    try {
-      const updates = {
-        ...updatedDraft,
-        updated_at: new Date().toISOString()
+  // Atualizar um draft existente
+  const updateDraft = useCallback(
+    async (updatedDraft: Partial<DraftState>): Promise<void> => {
+      if (!draft?.id) {
+        throw new Error("Nenhum draft selecionado")
       }
 
-      // Atualizar no Supabase
-      const { error } = await supabase
-        .from('drafts')
-        .update(updates)
-        .eq('id', draft.id)
+      setIsLoading(true)
+      setError(null)
 
-      if (error) {
-        throw new Error(`Erro ao atualizar draft: ${error.message}`)
+      try {
+        // Preparar os dados para o formato esperado pelo banco de dados (snake_case)
+        const dbUpdate: any = { ...updatedDraft };
+        
+        // Se estiver atualizando currentPick, usar o nome da coluna em snake_case
+        if (updatedDraft.currentPick !== undefined) {
+          dbUpdate.current_pick = updatedDraft.currentPick;
+          delete dbUpdate.currentPick;
+        }
+
+        // Certificar-se que outros campos camelCase são convertidos para snake_case
+        if (updatedDraft.maxPicks !== undefined) {
+          dbUpdate.max_picks = updatedDraft.maxPicks;
+          delete dbUpdate.maxPicks;
+        }
+        
+        if (updatedDraft.maxBans !== undefined) {
+          dbUpdate.max_bans = updatedDraft.maxBans;
+          delete dbUpdate.maxBans;
+        }
+
+        // Adicionar timestamp de atualização
+        dbUpdate.updated_at = new Date().toISOString();
+
+        const { error } = await supabase
+          .from('drafts')
+          .update(dbUpdate)
+          .eq('id', draft.id)
+
+        if (error) {
+          throw new Error(`Erro ao atualizar draft: ${error.message}`)
+        }
+
+        // Atualizar o estado local
+        setDraft({
+          ...draft,
+          ...updatedDraft,
+          updated_at: dbUpdate.updated_at
+        })
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : "Erro desconhecido"
+        setError(new Error(errorMessage))
+        throw err
+      } finally {
+        setIsLoading(false)
       }
-
-      // O draft será atualizado automaticamente pelo listener em tempo real
-    } catch (err) {
-      console.error("Erro ao atualizar draft:", err)
-    }
-  }, [draft])
+    },
+    [draft]
+  )
 
   // Buscar um draft específico pelo ID
-  const getDraftById = useCallback(async (draftId: string): Promise<DraftState | null> => {
-    setIsLoading(true)
-    
-    try {
-      const { data, error } = await supabase
-        .from('drafts')
-        .select('*')
-        .eq('id', draftId)
-        .single()
+  const getDraftById = useCallback(
+    async (draftId: string): Promise<DraftState | null> => {
+      try {
+        const { data, error } = await supabase
+          .from('drafts')
+          .select('*')
+          .eq('id', draftId)
+          .single()
 
-      if (error) {
-        throw error
+        if (error || !data) {
+          return null
+        }
+
+        // Mapear current_pick para currentPick se necessário
+        const draftData = data as any;
+        const draft: DraftState = {
+          ...draftData,
+          currentPick: draftData.current_pick !== undefined ? draftData.current_pick : draftData.currentPick || 0,
+        };
+
+        return draft;
+      } catch (err) {
+        console.error("Erro ao obter draft:", err)
+        return null
       }
-
-      const loadedDraft = data as DraftState
-      setDraft(loadedDraft)
-      return loadedDraft
-    } catch (err) {
-      console.error("Erro ao buscar draft:", err)
-      return null
-    } finally {
-      setIsLoading(false)
-    }
-  }, [])
+    },
+    [],
+  )
 
   // Buscar todos os drafts do usuário atual
   const getMyDrafts = useCallback(async (): Promise<DraftState[]> => {
-    if (!user) return []
-    
-    setIsLoading(true)
-    
+    if (!user) {
+      return []
+    }
+
     try {
-      // Buscar drafts onde o usuário é jogador 1 ou jogador 2
       const { data, error } = await supabase
         .from('drafts')
         .select('*')
-        .or(`player1->>id.eq.${user.id},player2->>id.eq.${user.id}`)
+        .or(`player1->id.eq.${user.id},player2->id.eq.${user.id}`)
         .order('created_at', { ascending: false })
 
       if (error) {
-        throw error
+        console.error("Erro ao buscar drafts:", error)
+        return []
       }
 
-      return data as DraftState[]
+      // Mapear current_pick para currentPick se necessário
+      const drafts = (data || []).map((draft: any) => ({
+        ...draft,
+        currentPick: draft.current_pick !== undefined ? draft.current_pick : draft.currentPick || 0,
+      }));
+
+      return drafts
     } catch (err) {
       console.error("Erro ao buscar drafts:", err)
       return []
-    } finally {
-      setIsLoading(false)
     }
   }, [user])
 

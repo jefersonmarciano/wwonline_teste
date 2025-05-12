@@ -69,7 +69,7 @@ export function FriendsProvider({ children }: { children: React.ReactNode }) {
         .select(`
           id,
           friend_id,
-          profiles:friend_id (id, name, player_id, avatar_url, last_active)
+          profiles(id, name, player_id, avatar_url, last_active)
         `)
         .eq('user_id', user.id)
 
@@ -77,13 +77,12 @@ export function FriendsProvider({ children }: { children: React.ReactNode }) {
         throw new Error(`Erro ao carregar amigos: ${friendsError.message}`)
       }
 
-      // Buscar solicitações pendentes recebidas
+      // Buscar solicitações pendentes recebidas e seus respectivos remetentes
       const { data: pendingData, error: pendingError } = await supabase
         .from('friend_requests')
         .select(`
           id,
           sender_id,
-          sender:sender_id (name, player_id),
           receiver_id,
           status,
           created_at
@@ -95,6 +94,26 @@ export function FriendsProvider({ children }: { children: React.ReactNode }) {
         throw new Error(`Erro ao carregar solicitações pendentes: ${pendingError.message}`)
       }
 
+      // Buscar perfis para os remetentes de solicitações pendentes
+      let pendingProfiles: Record<string, any> = {};
+      if (pendingData.length > 0) {
+        const senderIds = pendingData.map(req => req.sender_id);
+        const { data: senderProfiles, error: senderProfilesError } = await supabase
+          .from('profiles')
+          .select('id, name, player_id')
+          .in('id', senderIds);
+        
+        if (senderProfilesError) {
+          throw new Error(`Erro ao carregar perfis de remetentes: ${senderProfilesError.message}`);
+        }
+
+        // Indexar por ID para fácil acesso
+        pendingProfiles = senderProfiles.reduce((acc, profile) => {
+          acc[profile.id] = profile;
+          return acc;
+        }, {} as Record<string, any>);
+      }
+
       // Buscar solicitações enviadas
       const { data: sentData, error: sentError } = await supabase
         .from('friend_requests')
@@ -102,7 +121,6 @@ export function FriendsProvider({ children }: { children: React.ReactNode }) {
           id,
           sender_id,
           receiver_id,
-          receiver:receiver_id (name, player_id),
           status,
           created_at
         `)
@@ -113,39 +131,68 @@ export function FriendsProvider({ children }: { children: React.ReactNode }) {
         throw new Error(`Erro ao carregar solicitações enviadas: ${sentError.message}`)
       }
 
+      // Buscar perfis para os destinatários de solicitações enviadas
+      let receiverProfiles: Record<string, any> = {};
+      if (sentData.length > 0) {
+        const receiverIds = sentData.map(req => req.receiver_id);
+        const { data: receiverProfilesData, error: receiverProfilesError } = await supabase
+          .from('profiles')
+          .select('id, name, player_id')
+          .in('id', receiverIds);
+        
+        if (receiverProfilesError) {
+          throw new Error(`Erro ao carregar perfis de destinatários: ${receiverProfilesError.message}`);
+        }
+
+        // Indexar por ID para fácil acesso
+        receiverProfiles = receiverProfilesData.reduce((acc, profile) => {
+          acc[profile.id] = profile;
+          return acc;
+        }, {} as Record<string, any>);
+      }
+
       // Formatar os amigos
-      const formattedFriends = friendsData.map((item: any) => ({
-        id: item.id,
-        name: item.profiles.name,
-        playerId: item.profiles.player_id,
-        avatar: item.profiles.avatar_url,
-        lastActive: item.profiles.last_active,
-        online: item.profiles.last_active ? 
-                new Date(item.profiles.last_active).getTime() > Date.now() - 1000 * 60 * 5 
-                : false
-      }))
+      const formattedFriends = friendsData.map((item: any) => {
+        const profile = item.profiles || {};
+        return {
+          id: item.id,
+          name: profile.name || 'Desconhecido',
+          playerId: profile.player_id || '',
+          avatar: profile.avatar_url,
+          lastActive: profile.last_active,
+          online: profile.last_active ? 
+                  new Date(profile.last_active).getTime() > Date.now() - 1000 * 60 * 5 
+                  : false
+        };
+      })
 
-      // Formatar solicitações pendentes
-      const formattedPending = pendingData.map((item: any) => ({
-        id: item.id,
-        senderId: item.sender_id,
-        senderName: item.sender.name,
-        senderPlayerId: item.sender.player_id,
-        receiverId: item.receiver_id,
-        status: item.status,
-        created_at: item.created_at
-      }))
+      // Formatar solicitações pendentes com perfis do remetente
+      const formattedPending = pendingData.map((item: any) => {
+        const senderProfile = pendingProfiles[item.sender_id] || {};
+        return {
+          id: item.id,
+          senderId: item.sender_id,
+          senderName: senderProfile.name || 'Desconhecido',
+          senderPlayerId: senderProfile.player_id || '',
+          receiverId: item.receiver_id,
+          status: item.status,
+          created_at: item.created_at
+        };
+      })
 
-      // Formatar solicitações enviadas
-      const formattedSent = sentData.map((item: any) => ({
-        id: item.id,
-        senderId: item.sender_id,
-        receiverId: item.receiver_id,
-        receiverName: item.receiver.name,
-        receiverPlayerId: item.receiver.player_id,
-        status: item.status,
-        created_at: item.created_at
-      }))
+      // Formatar solicitações enviadas com perfis do destinatário
+      const formattedSent = sentData.map((item: any) => {
+        const receiverProfile = receiverProfiles[item.receiver_id] || {};
+        return {
+          id: item.id,
+          senderId: item.sender_id,
+          receiverId: item.receiver_id,
+          receiverName: receiverProfile.name || 'Desconhecido',
+          receiverPlayerId: receiverProfile.player_id || '',
+          status: item.status,
+          created_at: item.created_at
+        };
+      })
 
       setFriends(formattedFriends)
       setPendingRequests(formattedPending)

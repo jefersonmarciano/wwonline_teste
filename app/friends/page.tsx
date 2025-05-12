@@ -37,6 +37,7 @@ import { Separator } from "@/components/ui/separator"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { formatDistanceToNow } from "date-fns"
 import { ptBR } from "date-fns/locale"
+import MainLayout from "@/components/layouts/main-layout"
 
 export default function FriendsPage() {
   const router = useRouter()
@@ -124,363 +125,331 @@ export default function FriendsPage() {
   }
 
   return (
-    <div className="container mx-auto py-8 px-4">
-      <div className="max-w-5xl mx-auto">
-        <div className="flex items-center justify-between mb-8">
-          <h1 className="text-3xl font-bold">Amigos</h1>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleRefresh}
-            disabled={refreshing}
-          >
-            <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? "animate-spin" : ""}`} />
-            Atualizar
-          </Button>
-        </div>
+    <MainLayout>
+      <div className="container mx-auto py-8 px-4">
+        <div className="max-w-5xl mx-auto">
+          <div className="flex items-center justify-between mb-8">
+            <h1 className="text-3xl font-bold">Amigos</h1>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleRefresh}
+              disabled={refreshing}
+            >
+              <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? "animate-spin" : ""}`} />
+              Atualizar
+            </Button>
+          </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* Card para adicionar amigos */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Adicionar Amigo</CardTitle>
-              <CardDescription>
-                Adicione um amigo usando o ID do jogador
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleAddFriend} className="space-y-4">
-                <div className="space-y-2">
-                  <Input
-                    placeholder="ID do jogador"
-                    value={playerIdInput}
-                    onChange={(e) => setPlayerIdInput(e.target.value)}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Digite o ID de um jogador para enviar uma solicitação de amizade
-                  </p>
-                </div>
-
-                {addFriendError && (
-                  <Alert variant="destructive">
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertTitle>Erro</AlertTitle>
-                    <AlertDescription>{addFriendError}</AlertDescription>
-                  </Alert>
-                )}
-
-                {addFriendSuccess && (
-                  <Alert className="bg-green-700 text-white border-green-800">
-                    <CheckCircle className="h-4 w-4" />
-                    <AlertTitle>Sucesso</AlertTitle>
-                    <AlertDescription>
-                      Solicitação de amizade enviada!
-                    </AlertDescription>
-                  </Alert>
-                )}
-              </form>
-            </CardContent>
-            <CardFooter>
-              <Button 
-                className="w-full" 
-                onClick={handleAddFriend}
-                disabled={addingFriend || !playerIdInput.trim()}
-              >
-                <UserPlus className="h-4 w-4 mr-2" />
-                {addingFriend ? "Enviando..." : "Adicionar Amigo"}
-              </Button>
-            </CardFooter>
-          </Card>
-
-          {/* Card com seu ID de jogador */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Seu ID de Jogador</CardTitle>
-              <CardDescription>
-                Compartilhe com outros jogadores para que eles possam te adicionar
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="bg-muted rounded-md p-4 flex items-center gap-3">
-                <KeyRound className="h-5 w-5 text-primary" />
-                <div className="font-mono text-lg font-medium">{user?.playerId}</div>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Seu ID é único e permite que outros jogadores te encontrem facilmente.
-              </p>
-            </CardContent>
-            <CardFooter>
-              <Button 
-                variant="outline" 
-                className="w-full"
-                onClick={() => {
-                  if (user?.playerId) {
-                    navigator.clipboard.writeText(user.playerId)
-                  }
-                }}
-              >
-                Copiar ID
-              </Button>
-            </CardFooter>
-          </Card>
-
-          {/* Card com estatísticas */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Estatísticas</CardTitle>
-              <CardDescription>
-                Acompanhe suas conexões
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex justify-between items-center">
-                <div className="flex items-center gap-2">
-                  <Users className="h-5 w-5 text-blue-500" />
-                  <span>Total de amigos:</span>
-                </div>
-                <span className="font-bold">{friends.length}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <div className="flex items-center gap-2">
-                  <Clock className="h-5 w-5 text-amber-500" />
-                  <span>Solicitações pendentes:</span>
-                </div>
-                <span className="font-bold">{pendingRequests.length}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <div className="flex items-center gap-2">
-                  <UserPlus className="h-5 w-5 text-green-500" />
-                  <span>Solicitações enviadas:</span>
-                </div>
-                <span className="font-bold">{sentRequests.length}</span>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Tabs com lista de amigos e solicitações */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-8">
-          <TabsList className="mb-6">
-            <TabsTrigger value="friends">
-              Amigos ({friends.length})
-            </TabsTrigger>
-            <TabsTrigger value="pending">
-              Solicitações Recebidas ({pendingRequests.length})
-            </TabsTrigger>
-            <TabsTrigger value="sent">
-              Solicitações Enviadas ({sentRequests.length})
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="friends">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Card para adicionar amigos */}
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Users className="h-5 w-5" />
-                  Lista de Amigos
-                </CardTitle>
+                <CardTitle>Adicionar Amigo</CardTitle>
                 <CardDescription>
-                  Gerencie sua lista de amigos e veja quem está online
+                  Adicione um amigo usando o ID do jogador
                 </CardDescription>
               </CardHeader>
               <CardContent>
+                <form onSubmit={handleAddFriend} className="space-y-4">
+                  <div className="space-y-2">
+                    <Input
+                      placeholder="ID do jogador"
+                      value={playerIdInput}
+                      onChange={(e) => setPlayerIdInput(e.target.value)}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Digite o ID de um jogador para enviar uma solicitação de amizade
+                    </p>
+                  </div>
+
+                  {addFriendError && (
+                    <Alert variant="destructive">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertTitle>Erro</AlertTitle>
+                      <AlertDescription>{addFriendError}</AlertDescription>
+                    </Alert>
+                  )}
+
+                  {addFriendSuccess && (
+                    <Alert className="bg-green-700 text-white border-green-800">
+                      <CheckCircle className="h-4 w-4" />
+                      <AlertTitle>Sucesso</AlertTitle>
+                      <AlertDescription>
+                        Solicitação de amizade enviada!
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                </form>
+              </CardContent>
+              <CardFooter>
+                <Button 
+                  className="w-full" 
+                  onClick={handleAddFriend}
+                  disabled={addingFriend || !playerIdInput.trim()}
+                >
+                  <UserPlus className="h-4 w-4 mr-2" />
+                  {addingFriend ? "Enviando..." : "Adicionar Amigo"}
+                </Button>
+              </CardFooter>
+            </Card>
+
+            {/* Card com seu ID de jogador */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Seu ID de Jogador</CardTitle>
+                <CardDescription>
+                  Compartilhe com outros jogadores para que eles possam te adicionar
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center p-3 bg-muted rounded-md">
+                  <KeyRound className="h-5 w-5 text-primary mr-2" />
+                  <span className="text-lg font-mono tracking-wide">{user?.playerId || "-"}</span>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Card com status de amigos */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Status</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="bg-primary/20 p-2 rounded-full">
+                      <Users className="h-4 w-4 text-primary" />
+                    </div>
+                    <span>Total de amigos</span>
+                  </div>
+                  <span className="font-semibold">{friends.length}</span>
+                </div>
+                <Separator />
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="bg-yellow-500/20 p-2 rounded-full">
+                      <Clock className="h-4 w-4 text-yellow-500" />
+                    </div>
+                    <span>Solicitações pendentes</span>
+                  </div>
+                  <span className="font-semibold">{pendingRequests.length}</span>
+                </div>
+                <Separator />
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="bg-blue-500/20 p-2 rounded-full">
+                      <UserPlus className="h-4 w-4 text-blue-500" />
+                    </div>
+                    <span>Solicitações enviadas</span>
+                  </div>
+                  <span className="font-semibold">{sentRequests.length}</span>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="mt-10">
+            <Tabs value={activeTab} onValueChange={setActiveTab}>
+              <TabsList className="grid w-full grid-cols-3">
+                <TabsTrigger value="friends">
+                  Amigos ({friends.length})
+                </TabsTrigger>
+                <TabsTrigger value="pending">
+                  Solicitações ({pendingRequests.length})
+                </TabsTrigger>
+                <TabsTrigger value="sent">
+                  Enviadas ({sentRequests.length})
+                </TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="friends" className="mt-6">
                 {isLoading ? (
-                  <div className="py-8 text-center">
-                    <RefreshCw className="h-8 w-8 mx-auto mb-2 animate-spin text-muted-foreground" />
-                    <p className="text-muted-foreground">Carregando amigos...</p>
+                  <div className="text-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary mx-auto"></div>
+                    <p className="mt-2 text-muted-foreground">Carregando amigos...</p>
                   </div>
                 ) : friends.length === 0 ? (
-                  <div className="py-8 text-center">
-                    <Users className="h-12 w-12 mx-auto mb-3 text-muted-foreground/30" />
-                    <p className="text-muted-foreground">Você ainda não tem amigos.</p>
-                    <p className="text-sm text-muted-foreground">
-                      Adicione amigos usando o ID do jogador para começar.
+                  <div className="text-center py-12 bg-muted rounded-lg">
+                    <UserCircle className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                    <h3 className="font-medium text-lg mb-2">Nenhum amigo ainda</h3>
+                    <p className="text-muted-foreground mb-6">
+                      Você ainda não tem amigos adicionados.
+                    </p>
+                    <div className="flex justify-center">
+                      <Button variant="secondary" className="mr-2">
+                        <UserPlus className="h-4 w-4 mr-2" />
+                        Adicionar Amigo
+                      </Button>
+                      <Button variant="outline">
+                        <RefreshCw className="h-4 w-4 mr-2" />
+                        Atualizar
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {friends.map((friend) => (
+                      <Card key={friend.id}>
+                        <CardContent className="p-4">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center">
+                              <Avatar className="h-10 w-10 mr-3">
+                                <AvatarFallback>{friend.name?.[0]?.toUpperCase() || 'U'}</AvatarFallback>
+                              </Avatar>
+                              <div>
+                                <p className="font-medium">{friend.name}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {friend.online ? (
+                                    <span className="text-green-500 flex items-center">
+                                      <span className="w-2 h-2 rounded-full bg-green-500 mr-1"></span>
+                                      Online
+                                    </span>
+                                  ) : (
+                                    <span className="text-muted-foreground flex items-center">
+                                      <span className="w-2 h-2 rounded-full bg-gray-400 mr-1"></span>
+                                      Visto {formatLastActive(friend.lastActive)}
+                                    </span>
+                                  )}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex gap-2">
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                className="h-8 px-3"
+                                onClick={() => router.push(`/draft/create?opponent=${friend.playerId}`)}
+                              >
+                                Convidar
+                              </Button>
+                              <Button 
+                                variant="ghost" 
+                                size="sm"
+                                className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                                onClick={() => removeFriend(friend.id)}
+                              >
+                                <UserMinus className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </TabsContent>
+              
+              <TabsContent value="pending" className="mt-6">
+                {isLoading ? (
+                  <div className="text-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary mx-auto"></div>
+                    <p className="mt-2 text-muted-foreground">Carregando solicitações...</p>
+                  </div>
+                ) : pendingRequests.length === 0 ? (
+                  <div className="text-center py-12 bg-muted rounded-lg">
+                    <Clock className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                    <h3 className="font-medium text-lg mb-2">Nenhuma solicitação pendente</h3>
+                    <p className="text-muted-foreground">
+                      Você não tem solicitações de amizade para responder.
                     </p>
                   </div>
                 ) : (
-                  <ul className="divide-y">
-                    {friends.map((friend) => (
-                      <li key={friend.id} className="py-3 flex justify-between items-center">
-                        <div className="flex items-center gap-3">
-                          <div className="relative">
-                            <Avatar>
-                              <AvatarFallback>
-                                {friend.name.substring(0, 2).toUpperCase()}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div 
-                              className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-background ${
-                                friend.online ? 'bg-green-500' : 'bg-gray-400'
-                              }`}
-                            ></div>
-                          </div>
-                          <div>
-                            <p className="font-medium">{friend.name}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {friend.online 
-                                ? 'Online agora' 
-                                : `Visto ${formatLastActive(friend.lastActive)}`
-                              }
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex gap-2">
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            onClick={() => router.push(`/draft/create?opponent=${friend.playerId}`)}
-                          >
-                            Convidar
-                          </Button>
-                          <Button 
-                            variant="ghost" 
-                            size="icon"
-                            className="text-muted-foreground hover:text-destructive"
-                            onClick={() => removeFriend(friend.id)}
-                          >
-                            <UserMinus className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="pending">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Clock className="h-5 w-5" />
-                  Solicitações Recebidas
-                </CardTitle>
-                <CardDescription>
-                  Solicitações de amizade pendentes que você recebeu
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {isLoading ? (
-                  <div className="py-8 text-center">
-                    <RefreshCw className="h-8 w-8 mx-auto mb-2 animate-spin text-muted-foreground" />
-                    <p className="text-muted-foreground">Carregando solicitações...</p>
-                  </div>
-                ) : pendingRequests.length === 0 ? (
-                  <div className="py-8 text-center">
-                    <Clock className="h-12 w-12 mx-auto mb-3 text-muted-foreground/30" />
-                    <p className="text-muted-foreground">Nenhuma solicitação pendente.</p>
-                  </div>
-                ) : (
-                  <ul className="divide-y">
+                  <div className="space-y-4">
                     {pendingRequests.map((request) => (
-                      <li key={request.id} className="py-3">
-                        <div className="flex justify-between items-center mb-2">
-                          <div className="flex items-center gap-3">
-                            <Avatar>
-                              <AvatarFallback>
-                                {request.senderName?.substring(0, 2).toUpperCase() || 'US'}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div>
-                              <p className="font-medium">{request.senderName}</p>
-                              <p className="text-xs text-muted-foreground">
-                                ID: {request.senderPlayerId}
-                              </p>
+                      <Card key={request.id}>
+                        <CardContent className="p-4">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center">
+                              <Avatar className="h-10 w-10 mr-3">
+                                <AvatarFallback>{request.senderName?.[0]?.toUpperCase() || 'U'}</AvatarFallback>
+                              </Avatar>
+                              <div>
+                                <p className="font-medium">{request.senderName || 'Usuário'}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  Enviado {formatLastActive(request.created_at)}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex gap-2">
+                              <Button 
+                                variant="default" 
+                                size="sm" 
+                                className="h-8 px-3"
+                                onClick={() => acceptFriendRequest(request.id)}
+                              >
+                                <CheckCircle className="h-3.5 w-3.5 mr-1.5" />
+                                Aceitar
+                              </Button>
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                className="h-8 px-3"
+                                onClick={() => rejectFriendRequest(request.id)}
+                              >
+                                <XCircle className="h-3.5 w-3.5 mr-1.5" />
+                                Recusar
+                              </Button>
                             </div>
                           </div>
-                          <p className="text-xs text-muted-foreground">
-                            {formatLastActive(request.created_at)}
-                          </p>
-                        </div>
-                        <div className="flex justify-end gap-2 mt-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => rejectFriendRequest(request.id)}
-                          >
-                            <XCircle className="h-4 w-4 mr-1.5" />
-                            Recusar
-                          </Button>
-                          <Button
-                            size="sm"
-                            onClick={() => acceptFriendRequest(request.id)}
-                          >
-                            <CheckCircle className="h-4 w-4 mr-1.5" />
-                            Aceitar
-                          </Button>
-                        </div>
-                      </li>
+                        </CardContent>
+                      </Card>
                     ))}
-                  </ul>
+                  </div>
                 )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="sent">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <UserPlus className="h-5 w-5" />
-                  Solicitações Enviadas
-                </CardTitle>
-                <CardDescription>
-                  Solicitações de amizade que você enviou e aguardam resposta
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
+              </TabsContent>
+              
+              <TabsContent value="sent" className="mt-6">
                 {isLoading ? (
-                  <div className="py-8 text-center">
-                    <RefreshCw className="h-8 w-8 mx-auto mb-2 animate-spin text-muted-foreground" />
-                    <p className="text-muted-foreground">Carregando solicitações...</p>
+                  <div className="text-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary mx-auto"></div>
+                    <p className="mt-2 text-muted-foreground">Carregando convites enviados...</p>
                   </div>
                 ) : sentRequests.length === 0 ? (
-                  <div className="py-8 text-center">
-                    <UserPlus className="h-12 w-12 mx-auto mb-3 text-muted-foreground/30" />
-                    <p className="text-muted-foreground">Nenhuma solicitação enviada.</p>
+                  <div className="text-center py-12 bg-muted rounded-lg">
+                    <UserPlus className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                    <h3 className="font-medium text-lg mb-2">Nenhum convite enviado</h3>
+                    <p className="text-muted-foreground">
+                      Você não tem solicitações de amizade pendentes enviadas.
+                    </p>
                   </div>
                 ) : (
-                  <ul className="divide-y">
+                  <div className="space-y-4">
                     {sentRequests.map((request) => (
-                      <li key={request.id} className="py-3">
-                        <div className="flex justify-between items-center">
-                          <div className="flex items-center gap-3">
-                            <Avatar>
-                              <AvatarFallback>
-                                {request.receiverName?.substring(0, 2).toUpperCase() || 'US'}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div>
-                              <p className="font-medium">{request.receiverName}</p>
-                              <p className="text-xs text-muted-foreground">
-                                ID: {request.receiverPlayerId}
-                              </p>
+                      <Card key={request.id}>
+                        <CardContent className="p-4">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center">
+                              <Avatar className="h-10 w-10 mr-3">
+                                <AvatarFallback>{request.receiverName?.[0]?.toUpperCase() || 'U'}</AvatarFallback>
+                              </Avatar>
+                              <div>
+                                <p className="font-medium">{request.receiverName || 'Usuário'}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  Enviado {formatLastActive(request.created_at)}
+                                </p>
+                              </div>
                             </div>
-                          </div>
-                          <div className="flex items-center gap-4">
-                            <p className="text-xs text-muted-foreground">
-                              {formatLastActive(request.created_at)}
-                            </p>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="text-muted-foreground"
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              className="h-8 px-3"
                               onClick={() => cancelFriendRequest(request.id)}
                             >
-                              <XCircle className="h-4 w-4" />
+                              <XCircle className="h-3.5 w-3.5 mr-1.5" />
+                              Cancelar
                             </Button>
                           </div>
-                        </div>
-                      </li>
+                        </CardContent>
+                      </Card>
                     ))}
-                  </ul>
+                  </div>
                 )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
+              </TabsContent>
+            </Tabs>
+          </div>
+        </div>
       </div>
-    </div>
+    </MainLayout>
   )
 } 

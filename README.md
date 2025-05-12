@@ -26,6 +26,14 @@ Se estiver enfrentando erros relacionados ao banco de dados, como "Could not fin
 2. Siga as instruções para executar o script SQL de correção em `scripts/fix-database.sql`
 3. Para mais detalhes, consulte o arquivo `README-BANCO-DE-DADOS.md`
 
+### Erro "Supabase URL and Key are required"
+
+Se você estiver vendo erros relacionados às credenciais do Supabase:
+
+1. Crie um arquivo `.env.local` na raiz do projeto
+2. Configure as variáveis necessárias como descrito em `README.env.md`
+3. Reinicie o servidor de desenvolvimento
+
 ## Desenvolvimento Local
 
 ### Pré-requisitos
@@ -33,6 +41,7 @@ Se estiver enfrentando erros relacionados ao banco de dados, como "Could not fin
 - Node.js (v18+)
 - NPM ou Yarn
 - [Supabase CLI](https://supabase.com/docs/guides/cli) (opcional)
+- Conta no Supabase com um projeto criado
 
 ### Instalação
 
@@ -61,6 +70,13 @@ Se estiver enfrentando erros relacionados ao banco de dados, como "Could not fin
    ```
    npm run dev
    ```
+
+### Configuração do Banco de Dados
+
+Para configurar o banco de dados Supabase:
+
+1. Execute o script SQL em `scripts/setup-supabase.sql` no editor SQL do Supabase
+2. Se encontrar problemas com as tabelas, execute `scripts/fix-database.sql`
 
 ### Estrutura do Projeto
 

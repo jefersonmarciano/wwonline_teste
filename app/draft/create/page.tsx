@@ -12,7 +12,7 @@ import { useDraft } from "@/hooks/use-draft"
 import { useTeams } from "@/hooks/use-teams"
 import { useFriends } from "@/hooks/use-friends"
 import { useNotifications } from "@/hooks/use-notifications"
-import { Shield, Info, Users, CheckCircle } from "lucide-react"
+import { Shield, Info, Users, CheckCircle, Clipboard, Copy, Link as LinkIcon } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 import { 
   Select, 
@@ -22,6 +22,7 @@ import {
   SelectValue 
 } from "@/components/ui/select"
 import { Suspense } from "react"
+import MainLayout from "@/components/layouts/main-layout"
 
 // Componente interno que usa searchParams
 function CreateDraftForm() {
@@ -39,6 +40,10 @@ function CreateDraftForm() {
   const [error, setError] = useState<string | null>(null)
   const [isCreating, setIsCreating] = useState(false)
   const [notificationSent, setNotificationSent] = useState(false)
+  const [inviteCode, setInviteCode] = useState<string>("")
+  const [draftId, setDraftId] = useState<string>("")
+  const [isCopied, setIsCopied] = useState(false)
+  const [isLinkCopied, setIsLinkCopied] = useState(false)
   
   const decks = getDecks()
 
@@ -75,12 +80,27 @@ function CreateDraftForm() {
     router.push("/login")
     return null
   }
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    setIsCopied(true);
+    setTimeout(() => setIsCopied(false), 2000);
+  };
+
+  const copyLinkToClipboard = (code: string) => {
+    const url = `${window.location.origin}/draft/join?code=${code}`;
+    navigator.clipboard.writeText(url);
+    setIsLinkCopied(true);
+    setTimeout(() => setIsLinkCopied(false), 2000);
+  };
   
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
     setError(null)
     setIsCreating(true)
     setNotificationSent(false)
+    setInviteCode("")
+    setDraftId("")
     
     try {
       // Verificar se um deck foi selecionado
@@ -109,37 +129,47 @@ function CreateDraftForm() {
       }
       
       // Criar o draft
-      const draftId = await createDraft(opponentUserId)
+      const newDraftId = await createDraft(opponentUserId)
+      setDraftId(newDraftId)
       
       // Gerar um código de convite aleatório
-      const inviteCode = Math.random().toString(36).substring(2, 8).toUpperCase()
+      const code = Math.random().toString(36).substring(2, 8).toUpperCase()
+      setInviteCode(code)
       
       // Salvar informações adicionais sobre o draft
       await supabase
         .from('draft_details')
         .insert([{
-          draft_id: draftId,
+          draft_id: newDraftId,
           player1_deck_id: selectedDeckId,
           player2_deck_id: null,
           status: 'waiting', // Esperando oponente
-          invite_code: inviteCode
+          invite_code: code
         }])
       
       // Se um oponente foi especificado, enviar uma notificação
       if (opponentUserId) {
         const notificationSent = await createDraftInviteNotification(
           opponentUserId, 
-          draftId,
-          inviteCode
+          newDraftId,
+          code
         )
         setNotificationSent(notificationSent)
       }
       
-      // Redirecionar para a sala de draft
-      router.push(`/draft/room/${draftId}`)
+      // Não redirecionamos mais automaticamente
+      // router.push(`/draft/room/${draftId}`)
+      setIsCreating(false)
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao criar sala de draft")
       setIsCreating(false)
+    }
+  }
+  
+  // Redirecionar para a sala de draft
+  const goToDraftRoom = () => {
+    if (draftId) {
+      router.push(`/draft/room/${draftId}`)
     }
   }
   
@@ -166,148 +196,195 @@ function CreateDraftForm() {
           </Alert>
         )}
         
-        <Card>
-          <CardHeader>
-            <CardTitle>Configurações da Sala</CardTitle>
-            <CardDescription>
-              Configure sua sala de draft e convide um oponente
-            </CardDescription>
-          </CardHeader>
-          
-          <form onSubmit={handleSubmit}>
-            <CardContent className="space-y-6">
-              <div className="space-y-2">
-                <Label htmlFor="deck">Seu Deck</Label>
-                {decks.length === 0 ? (
-                  <div className="bg-muted p-4 rounded-md">
-                    <p className="text-sm text-muted-foreground">
-                      Você não possui nenhum deck para torneio. Crie um deck com pelo menos 15 personagens.
-                    </p>
-                    <Button 
-                      variant="secondary" 
-                      size="sm" 
-                      className="mt-2"
-                      onClick={() => router.push("/teams/create")}
-                    >
-                      Criar Deck
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {decks.map((deck) => (
-                      <div 
-                        key={deck.id}
-                        className={`
-                          p-3 rounded-md border cursor-pointer
-                          ${selectedDeckId === deck.id 
-                            ? 'border-primary bg-primary/10' 
-                            : 'border-border bg-card hover:bg-muted/50'
-                          }
-                        `}
-                        onClick={() => setSelectedDeckId(deck.id)}
-                      >
-                        <div className="flex items-center gap-2">
-                          <Shield className="h-5 w-5 text-primary" />
-                          <div>
-                            <h3 className="font-medium">{deck.name}</h3>
-                            <p className="text-xs text-muted-foreground">
-                              {deck.characters.length} personagens • Custo: {deck.totalCost}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-              
-              {/* Seleção de amigos */}
-              {friends.length > 0 && (
-                <div className="space-y-2">
-                  <Label htmlFor="friend">Convidar Amigo</Label>
-                  <Select 
-                    value={selectedFriendId} 
-                    onValueChange={setSelectedFriendId}
+        {inviteCode ? (
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle>Sala Criada com Sucesso!</CardTitle>
+              <CardDescription>
+                Compartilhe este código com seus amigos para que eles possam entrar na sala.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="p-4 border rounded-md bg-primary/10 flex items-center justify-between">
+                <div className="text-2xl font-bold tracking-wider">{inviteCode}</div>
+                <div className="flex gap-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => copyToClipboard(inviteCode)}
+                    className="flex items-center gap-2"
                   >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione um amigo para convidar" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="">-- Selecionar amigo --</SelectItem>
-                      {friends.map((friend) => (
-                        <SelectItem key={friend.id} value={friend.id}>
-                          {friend.name} {friend.online && '(Online)'}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <div className="flex items-center justify-between text-sm text-muted-foreground">
-                    <p>Ou digite um ID manualmente</p>
-                    <Button
-                      type="button"
-                      variant="link"
-                      size="sm"
-                      className="h-auto p-0"
-                      onClick={() => router.push('/friends')}
-                    >
-                      <Users className="h-3.5 w-3.5 mr-1.5" />
-                      Gerenciar Amigos
-                    </Button>
-                  </div>
+                    <Copy className="h-4 w-4" />
+                    {isCopied ? "Copiado!" : "Copiar Código"}
+                  </Button>
                 </div>
-              )}
-              
-              <div className="space-y-2">
-                <Label htmlFor="opponentId">ID do Oponente</Label>
-                <Input
-                  id="opponentId"
-                  placeholder="Digite o ID do oponente"
-                  value={opponentId}
-                  onChange={(e) => {
-                    setOpponentId(e.target.value)
-                    setSelectedFriendId("")
-                  }}
-                />
-                <p className="text-sm text-muted-foreground">
-                  Se não informado, qualquer jogador poderá entrar usando o link da sala.
-                </p>
               </div>
               
-              <div className="bg-muted p-4 rounded-md">
-                <div className="flex items-start gap-2">
-                  <Info className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />
-                  <div className="text-sm text-muted-foreground">
-                    <p className="font-medium mb-1">Como funciona o draft?</p>
-                    <p>O draft segue a ordem:</p>
-                    <ol className="list-decimal ml-4 space-y-1">
-                      <li>Banimentos iniciais: Jogador 1 → Jogador 2</li>
-                      <li>Picks iniciais (4 rodadas): Jogador 1 → Jogador 2</li>
-                      <li>Banimentos do meio: Jogador 1 → Jogador 2</li>
-                      <li>Picks finais (3 rodadas): Jogador 1 → Jogador 2</li>
-                    </ol>
-                  </div>
+              <div className="p-4 border rounded-md bg-secondary/10 flex items-center justify-between">
+                <div className="text-sm text-muted-foreground truncate">
+                  {`${window.location.origin}/draft/join?code=${inviteCode}`}
                 </div>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => copyLinkToClipboard(inviteCode)}
+                  className="flex items-center gap-2 whitespace-nowrap"
+                >
+                  <LinkIcon className="h-4 w-4" />
+                  {isLinkCopied ? "Copiado!" : "Copiar Link"}
+                </Button>
               </div>
             </CardContent>
-            
-            <CardFooter className="flex justify-between">
-              <Button 
-                variant="outline" 
-                onClick={() => router.back()}
-              >
-                Cancelar
-              </Button>
-              <Button 
-                type="submit" 
-                disabled={isCreating || decks.length === 0 || !selectedDeckId}
-              >
-                {isCreating ? "Criando..." : "Criar Sala"}
+            <CardFooter>
+              <Button onClick={goToDraftRoom} className="w-full">
+                Entrar na Sala de Draft
               </Button>
             </CardFooter>
-          </form>
-        </Card>
+          </Card>
+        ) : (
+          <Card>
+            <CardHeader>
+              <CardTitle>Configurações da Sala</CardTitle>
+              <CardDescription>
+                Configure sua sala de draft e convide um oponente
+              </CardDescription>
+            </CardHeader>
+            
+            <form onSubmit={handleSubmit}>
+              <CardContent className="space-y-6">
+                <div className="space-y-2">
+                  <Label htmlFor="deck">Seu Deck</Label>
+                  {decks.length === 0 ? (
+                    <div className="bg-muted p-4 rounded-md">
+                      <p className="text-sm text-muted-foreground">
+                        Você não possui nenhum deck para torneio. Crie um deck com pelo menos 15 personagens.
+                      </p>
+                      <Button 
+                        variant="secondary" 
+                        size="sm" 
+                        className="mt-2"
+                        onClick={() => router.push("/teams/create")}
+                      >
+                        Criar Deck
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {decks.map((deck) => (
+                        <div 
+                          key={deck.id}
+                          className={`
+                            p-3 rounded-md border cursor-pointer
+                            ${selectedDeckId === deck.id 
+                              ? 'border-primary bg-primary/10' 
+                              : 'border-border bg-card hover:bg-muted/50'
+                            }
+                          `}
+                          onClick={() => setSelectedDeckId(deck.id)}
+                        >
+                          <div className="flex items-center gap-2">
+                            <Shield className="h-5 w-5 text-primary" />
+                            <div>
+                              <h3 className="font-medium">{deck.name}</h3>
+                              <p className="text-xs text-muted-foreground">
+                                {deck.characters.length} personagens • Custo: {deck.totalCost}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                
+                {/* Seleção de amigos */}
+                {friends.length > 0 && (
+                  <div className="space-y-2">
+                    <Label htmlFor="friend">Convidar Amigo</Label>
+                    <Select 
+                      value={selectedFriendId} 
+                      onValueChange={setSelectedFriendId}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione um amigo para convidar" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="">-- Selecionar amigo --</SelectItem>
+                        {friends.map((friend) => (
+                          <SelectItem key={friend.id} value={friend.id}>
+                            {friend.name} {friend.online && '(Online)'}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <div className="flex items-center justify-between text-sm text-muted-foreground">
+                      <p>Ou digite um ID manualmente</p>
+                      <Button
+                        type="button"
+                        variant="link"
+                        size="sm"
+                        className="h-auto p-0"
+                        onClick={() => router.push('/friends')}
+                      >
+                        <Users className="h-3.5 w-3.5 mr-1.5" />
+                        Gerenciar Amigos
+                      </Button>
+                    </div>
+                  </div>
+                )}
+                
+                <div className="space-y-2">
+                  <Label htmlFor="opponentId">ID do Oponente</Label>
+                  <Input
+                    id="opponentId"
+                    placeholder="Digite o ID do oponente"
+                    value={opponentId}
+                    onChange={(e) => {
+                      setOpponentId(e.target.value)
+                      setSelectedFriendId("")
+                    }}
+                  />
+                  <p className="text-sm text-muted-foreground">
+                    Se não informado, qualquer jogador poderá entrar usando o link da sala.
+                  </p>
+                </div>
+                
+                <div className="bg-muted p-4 rounded-md">
+                  <div className="flex items-start gap-2">
+                    <Info className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />
+                    <div className="text-sm text-muted-foreground">
+                      <p className="font-medium mb-1">Como funciona o draft?</p>
+                      <p>O draft segue a ordem:</p>
+                      <ol className="list-decimal ml-4 space-y-1">
+                        <li>Banimentos iniciais: Jogador 1 → Jogador 2</li>
+                        <li>Picks iniciais (4 rodadas): Jogador 1 → Jogador 2</li>
+                        <li>Banimentos do meio: Jogador 1 → Jogador 2</li>
+                        <li>Picks finais (3 rodadas): Jogador 1 → Jogador 2</li>
+                      </ol>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+              
+              <CardFooter className="flex justify-between">
+                <Button 
+                  variant="outline" 
+                  onClick={() => router.back()}
+                >
+                  Cancelar
+                </Button>
+                <Button 
+                  type="submit" 
+                  disabled={isCreating || decks.length === 0 || !selectedDeckId}
+                >
+                  {isCreating ? "Criando..." : "Criar Sala"}
+                </Button>
+              </CardFooter>
+            </form>
+          </Card>
+        )}
         
-        {user?.playerId && (
+        {user?.playerId && !inviteCode && (
           <div className="mt-4 p-4 bg-muted rounded-md">
             <p className="text-sm">
               <span className="font-medium">Seu ID de jogador:</span> {user.playerId}
@@ -325,12 +402,14 @@ function CreateDraftForm() {
 // Página principal com Suspense para o useSearchParams
 export default function CreateDraftPage() {
   return (
-    <Suspense fallback={
-      <div className="container py-8 flex justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
-      </div>
-    }>
-      <CreateDraftForm />
-    </Suspense>
+    <MainLayout>
+      <Suspense fallback={
+        <div className="container py-8 flex justify-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+        </div>
+      }>
+        <CreateDraftForm />
+      </Suspense>
+    </MainLayout>
   )
 }
