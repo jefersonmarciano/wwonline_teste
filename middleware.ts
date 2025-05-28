@@ -22,7 +22,21 @@ const isPublicPath = (path: string) => {
 }
 
 export async function middleware(req: NextRequest) {
-  const res = NextResponse.next()
+  // Criar um response inicial para podermos adicionar os headers CORS
+  let res = NextResponse.next()
+  
+  // Configuração CORS abrangente para todas as requisições
+  // Permitir qualquer origem durante desenvolvimento e testes
+  res.headers.set('Access-Control-Allow-Origin', '*')
+  res.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
+  res.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Client-Info, apikey, X-CSRF-Token')
+  res.headers.set('Access-Control-Allow-Credentials', 'true')
+  res.headers.set('Access-Control-Max-Age', '86400') // 24 horas
+  
+  // Para preflight requests (OPTIONS)
+  if (req.method === 'OPTIONS') {
+    return res
+  }
   
   // Não aplicar middleware em recursos estáticos
   if (
@@ -41,7 +55,6 @@ export async function middleware(req: NextRequest) {
     console.warn('Variáveis de ambiente do Supabase não definidas. Configure .env.local com NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY')
     
     // Se estamos em desenvolvimento, apenas continuar sem verificação de autenticação
-    // Em produção, você pode querer tratar isso de forma diferente
     if (process.env.NODE_ENV === 'development') {
       return res
     }
@@ -90,6 +103,9 @@ export async function middleware(req: NextRequest) {
       const { data: { session } } = await supabase.auth.getSession()
       const path = req.nextUrl.pathname
       
+      // Debug para identificar problemas
+      console.log(`Middleware processando: ${path}, Sessão: ${session ? 'Ativa' : 'Inativa'}`)
+      
       // Se é uma página de autenticação e o usuário está autenticado, redirecionar para dashboard
       if ((path === '/login' || path === '/register') && session) {
         return NextResponse.redirect(new URL('/dashboard', req.url))
@@ -104,6 +120,7 @@ export async function middleware(req: NextRequest) {
       }
     }
     
+    // Importante: retornar a resposta modificada com os headers CORS
     return res
   } catch (err) {
     console.error('Middleware error:', err)

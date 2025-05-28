@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useAuth } from "@/hooks/use-auth"
-import MainLayout from "@/components/layouts/main-layout"
+import DashboardLayout from "@/components/layouts/dashboard-layout"
 import { PlusCircle, Edit, Trash2, X, Shield } from "lucide-react"
 import Link from "next/link"
 import { useTeams } from "@/hooks/use-teams"
@@ -325,195 +325,267 @@ export default function TeamsPage() {
   }
 
   return (
-    <MainLayout>
-      <div className="container mx-auto py-8">
-        <div className="mb-6 flex justify-between items-center">
-          <h1 className="text-3xl font-bold">Equipes</h1>
-          <div className="flex gap-2">
-            <Button onClick={() => openCreateModal(false)}>
-              <PlusCircle className="mr-2 h-4 w-4" />
-              Nova Equipe
-            </Button>
-            <Button onClick={() => openCreateModal(true)} variant="outline">
-              <Shield className="mr-2 h-4 w-4" />
-              Novo Deck
-            </Button>
-          </div>
-        </div>
+    <DashboardLayout>
+      <div className="p-6">
+        <Tabs defaultValue="teams" value={activeTab} onValueChange={setActiveTab}>
+          <div className="flex justify-between items-center mb-6">
+            <div>
+              <h1 className="text-3xl font-bold mb-2">Meus Times</h1>
+              <TabsList>
+                <TabsTrigger value="teams">Times</TabsTrigger>
+                <TabsTrigger value="decks">Decks de Torneio</TabsTrigger>
+              </TabsList>
+            </div>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="w-full justify-start">
-            <TabsTrigger value="teams">Equipes ({normalTeams.length})</TabsTrigger>
-            <TabsTrigger value="decks">Decks de Torneio ({decks.length})</TabsTrigger>
-          </TabsList>
-          <TabsContent value="teams" className="mt-4">
-            {normalTeams.length === 0 ? (
-              <div className="text-center py-8 bg-gray-800 rounded-lg border border-gray-700">
-                <p className="text-gray-400 mb-4">Você ainda não criou nenhuma equipe</p>
-                <Button onClick={() => openCreateModal(false)}>
-                  <PlusCircle className="mr-2 h-4 w-4" />
-                  Criar Equipe
-                </Button>
-              </div>
+            {activeTab === "teams" ? (
+              <Button onClick={() => openCreateModal(false)}>
+                <PlusCircle className="h-4 w-4 mr-2" />
+                Criar Novo Time
+              </Button>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <Button onClick={() => openCreateModal(true)}>
+                <PlusCircle className="h-4 w-4 mr-2" />
+                Criar Novo Deck
+              </Button>
+            )}
+          </div>
+
+          <TabsContent value="teams">
+            {normalTeams.length === 0 ? (
+              <Card className="border-dashed">
+                <CardContent className="pt-6 text-center">
+                  <div className="mb-4">
+                    <div className="h-20 w-20 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
+                      <PlusCircle className="h-10 w-10 text-primary" />
+                    </div>
+                  </div>
+                  <h2 className="text-xl font-semibold mb-2">Nenhum time criado</h2>
+                  <p className="text-muted-foreground mb-4">
+                    Crie seu primeiro time para participar de drafts e torneios
+                  </p>
+                  <Button onClick={() => openCreateModal(false)}>Criar Time</Button>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {normalTeams.map((team) => renderTeam(team))}
               </div>
             )}
           </TabsContent>
-          <TabsContent value="decks" className="mt-4">
+
+          <TabsContent value="decks">
             {decks.length === 0 ? (
-              <div className="text-center py-8 bg-gray-800 rounded-lg border border-gray-700">
-                <p className="text-gray-400 mb-4">Você ainda não criou nenhum deck para torneios</p>
-                <Button onClick={() => openCreateModal(true)}>
-                  <Shield className="mr-2 h-4 w-4" />
-                  Criar Deck de Torneio
-                </Button>
-              </div>
+              <Card className="border-dashed border-yellow-600/50">
+                <CardContent className="pt-6 text-center">
+                  <div className="mb-4">
+                    <div className="h-20 w-20 rounded-full bg-yellow-600/10 flex items-center justify-center mx-auto">
+                      <Shield className="h-10 w-10 text-yellow-600" />
+                    </div>
+                  </div>
+                  <h2 className="text-xl font-semibold mb-2">Nenhum deck de torneio criado</h2>
+                  <p className="text-muted-foreground mb-4">
+                    Crie um deck com pelo menos 15 personagens para participar de torneios oficiais
+                  </p>
+                  <Button onClick={() => openCreateModal(true)} className="bg-yellow-600 hover:bg-yellow-700">
+                    Criar Deck de Torneio
+                  </Button>
+                </CardContent>
+              </Card>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {decks.map((deck) => renderDeck(deck))}
-              </div>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">{decks.map((deck) => renderDeck(deck))}</div>
             )}
           </TabsContent>
         </Tabs>
+      </div>
 
-        {/* Diálogo para criação de time */}
-        <Dialog open={isCreateTeamOpen} onOpenChange={setIsCreateTeamOpen}>
-          <DialogContent className="sm:max-w-[600px]">
-            <DialogHeader>
-              <DialogTitle>{isDeckCreation ? "Criar Novo Deck" : "Criar Nova Equipe"}</DialogTitle>
-              <DialogDescription>
+      {/* Modal de criação de time/deck */}
+      <Dialog open={isCreateTeamOpen} onOpenChange={setIsCreateTeamOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{isDeckCreation ? "Criar Novo Deck de Torneio" : "Criar Novo Time"}</DialogTitle>
+            <DialogDescription>
+              {isDeckCreation
+                ? "Crie um novo deck com pelo menos 15 personagens para participar de torneios oficiais."
+                : "Crie um novo time com até 3 personagens para participar de drafts e torneios."}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="teamName">{isDeckCreation ? "Nome do Deck" : "Nome do Time"}</Label>
+              <Input
+                id="teamName"
+                placeholder={isDeckCreation ? "Ex: Deck Principal" : "Ex: Time Principal"}
+                value={teamName}
+                onChange={(e) => setTeamName(e.target.value)}
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>
                 {isDeckCreation
-                  ? "Crie um deck para uso em torneios"
-                  : "Crie uma equipe para completar missões e desafios"}
-              </DialogDescription>
-            </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="grid gap-2">
-                <Label htmlFor="team-name">Nome</Label>
-                <Input
-                  id="team-name"
-                  value={teamName}
-                  onChange={(e) => setTeamName(e.target.value)}
-                  placeholder={isDeckCreation ? "Nome do Deck" : "Nome da Equipe"}
-                />
-              </div>
-              
-              <div className="grid gap-2">
-                <Label>
-                  {isDeckCreation ? (
-                    <span>Personagens <span className="text-gray-400 text-sm">({selectedCharacters.length}/15 mínimo)</span></span>
-                  ) : (
-                    <span>Personagens <span className="text-gray-400 text-sm">({selectedCharacters.length}/3)</span></span>
-                  )}
-                </Label>
-                
-                <div className="flex flex-wrap gap-2 min-h-12 border p-2 rounded-md">
-                  {selectedCharacters.length === 0 ? (
-                    <div className="text-sm text-gray-400 flex-1 text-center py-2">
-                      Selecione personagens para adicionar
-                    </div>
-                  ) : (
-                    selectedCharacters.map((character) => (
-                      <div
-                        key={character.id}
-                        className="flex items-center gap-1 bg-primary/20 rounded px-2 py-1"
-                      >
-                        <span className="text-sm">{character.name}</span>
+                  ? `Personagens (Mínimo: 15, Selecionados: ${selectedCharacters.length})`
+                  : "Personagens (Máximo: 3)"}
+              </Label>
+
+              {/* Mostrar apenas alguns personagens selecionados para economizar espaço */}
+              <div className="grid grid-cols-5 gap-2">
+                {selectedCharacters.slice(0, 5).map((character) => (
+                  <div key={character.id} className="relative">
+                    <div className="aspect-square bg-gray-800 rounded-md overflow-hidden">
+                      <div className="absolute top-0 right-0 p-1">
                         <Button
-                          variant="ghost"
+                          variant="destructive"
                           size="icon"
-                          className="h-5 w-5"
+                          className="h-6 w-6 rounded-full"
+                          type="button"
                           onClick={() => handleRemoveCharacter(character.id)}
                         >
                           <X className="h-3 w-3" />
                         </Button>
                       </div>
-                    ))
-                  )}
-                </div>
-                
-                <Button
-                  variant="outline"
-                  onClick={() => setIsCharacterSelectorOpen(true)}
-                >
-                  <PlusCircle className="h-4 w-4 mr-2" />
-                  Adicionar Personagem
-                </Button>
-              </div>
-              
-              <div className="flex items-center justify-between mt-4">
-                <div className="text-sm">
-                  <span className="font-medium">Custo Total:</span>{" "}
-                  <span className="text-primary">{calculateTeamCost(selectedCharacters.map((c) => c.id))}</span>
-                </div>
-                
-                <div className="flex gap-2">
-                  <Button variant="outline" onClick={() => setIsCreateTeamOpen(false)}>
-                    Cancelar
-                  </Button>
+                      {character.imagePath ? (
+                        <Image
+                          src={character.imagePath || "/placeholder.svg"}
+                          alt={character.name}
+                          width={100}
+                          height={100}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-xl font-bold text-gray-600">
+                          {character.name.charAt(0)}
+                        </div>
+                      )}
+                      <div className="absolute bottom-0 left-0 w-full p-1 bg-black/60">
+                        <div className="text-xs text-white truncate">{character.name}</div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+
+                {/* Mostrar quantos personagens adicionais estão selecionados */}
+                {selectedCharacters.length > 5 && (
+                  <div className="aspect-square bg-gray-800/50 rounded-md border border-dashed border-gray-700 flex items-center justify-center">
+                    <span className="text-sm text-gray-400">+{selectedCharacters.length - 5}</span>
+                  </div>
+                )}
+
+                {/* Botão para adicionar personagens */}
+                {(!isDeckCreation && selectedCharacters.length < 3) || isDeckCreation ? (
                   <Button
-                    onClick={handleCreateTeam}
-                    disabled={
-                      teamName.trim() === "" ||
-                      selectedCharacters.length === 0 ||
-                      isSubmitting ||
-                      (isDeckCreation && selectedCharacters.length < 15)
-                    }
+                    type="button"
+                    variant="outline"
+                    className="aspect-square flex flex-col items-center justify-center border-dashed"
+                    onClick={() => setIsCharacterSelectorOpen(true)}
                   >
-                    {isSubmitting ? "Criando..." : isDeckCreation ? "Criar Deck" : "Criar Equipe"}
+                    <PlusCircle className="h-8 w-8 mb-2" />
+                    <span className="text-sm">Adicionar</span>
                   </Button>
+                ) : null}
+              </div>
+
+              {selectedCharacters.length === 0 && (
+                <div className="text-center py-4 text-muted-foreground">
+                  {isDeckCreation
+                    ? "Adicione pelo menos 15 personagens ao seu deck para continuar"
+                    : "Adicione personagens ao seu time para continuar"}
+                </div>
+              )}
+            </div>
+
+            {/* Estatísticas em uma única linha */}
+            <div className="flex gap-2 justify-between">
+              <div className="bg-card border rounded-md p-2 flex-1">
+                <div className="text-xs font-medium text-muted-foreground">Total</div>
+                <div className="text-lg font-bold">
+                  {selectedCharacters.length}/{isDeckCreation ? "15+" : "3"}
                 </div>
               </div>
+
+              <div className="bg-card border rounded-md p-2 flex-1">
+                <div className="text-xs font-medium text-muted-foreground">5★</div>
+                <div className="text-lg font-bold">{selectedCharacters.filter((c) => c.rarity === 5).length}</div>
+              </div>
+
+              <div className="bg-card border rounded-md p-2 flex-1">
+                <div className="text-xs font-medium text-muted-foreground">4★</div>
+                <div className="text-lg font-bold">{selectedCharacters.filter((c) => c.rarity === 4).length}</div>
+              </div>
             </div>
-          </DialogContent>
-        </Dialog>
-        
-        {/* Seletor de personagens */}
-        <Dialog open={isCharacterSelectorOpen} onOpenChange={setIsCharacterSelectorOpen}>
-          <DialogContent className="sm:max-w-[800px] h-[80vh] flex flex-col">
-            <DialogHeader>
-              <DialogTitle>Selecionar Personagens</DialogTitle>
-              <DialogDescription>
-                Clique nos personagens para adicioná-los à sua equipe
-              </DialogDescription>
-            </DialogHeader>
-            <div className="flex-1 overflow-hidden">
-              <CharacterSelector
-                onSelect={handleAddCharacter}
-                selectedCharacters={selectedCharacters.map((c) => c.id)}
-                maxSelection={isDeckCreation ? 30 : 3}
-              />
-            </div>
-            <div className="flex justify-end pt-4">
-              <Button onClick={() => setIsCharacterSelectorOpen(false)}>
-                Concluir
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
-        
-        {/* Diálogo de confirmação para exclusão */}
-        <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Confirmar Exclusão</DialogTitle>
-              <DialogDescription>
-                Tem certeza que deseja excluir este time? Esta ação não pode ser desfeita.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>
-                Cancelar
-              </Button>
-              <Button variant="destructive" onClick={handleDeleteTeam}>
-                Excluir
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
-      </div>
-    </MainLayout>
+
+            {isDeckCreation && (
+              <div className="bg-yellow-950/20 border border-yellow-600/30 rounded-md p-3">
+                <h3 className="text-sm font-medium text-yellow-500 mb-1">Requisitos para Torneio</h3>
+                <ul className="text-xs space-y-1 text-muted-foreground">
+                  <li className="flex items-center">
+                    <div
+                      className={`w-3 h-3 mr-2 rounded-full ${selectedCharacters.length >= 15 ? "bg-green-500" : "bg-gray-500"}`}
+                    ></div>
+                    Mínimo de 15 personagens
+                  </li>
+                  <li className="flex items-center">
+                    <div
+                      className={`w-3 h-3 mr-2 rounded-full ${calculateTeamCost(selectedCharacters.map((c) => c.id)) >= 250 ? "bg-green-500" : "bg-gray-500"}`}
+                    ></div>
+                    Custo mínimo de 250 pontos
+                  </li>
+                </ul>
+              </div>
+            )}
+          </div>
+
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setIsCreateTeamOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleCreateTeam}
+              disabled={
+                isSubmitting ||
+                teamName.trim() === "" ||
+                selectedCharacters.length === 0 ||
+                (isDeckCreation && selectedCharacters.length < 15)
+              }
+              className={isDeckCreation ? "bg-yellow-600 hover:bg-yellow-700" : ""}
+            >
+              {isSubmitting ? "Criando..." : isDeckCreation ? "Criar Deck" : "Criar Time"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de seleção de personagens */}
+      <CharacterSelector
+        open={isCharacterSelectorOpen}
+        onOpenChange={setIsCharacterSelectorOpen}
+        onSelect={handleAddCharacter}
+        characters={characters}
+        selectedCharacters={selectedCharacters.map((c) => c.id)}
+        multiSelect={isDeckCreation}
+      />
+
+      {/* Diálogo de confirmação de exclusão */}
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Confirmar Exclusão</DialogTitle>
+            <DialogDescription>
+              Tem certeza que deseja excluir este {teams.find((t) => t.id === teamToDelete)?.isDeck ? "deck" : "time"}?
+              Esta ação não pode ser desfeita.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-2 pt-4">
+            <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button variant="destructive" onClick={handleDeleteTeam}>
+              Excluir
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </DashboardLayout>
   )
 }

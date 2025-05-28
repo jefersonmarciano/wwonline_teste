@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { createContext, useContext, useState, useEffect } from "react"
+import { createContext, useContext, useState, useEffect, useCallback } from "react"
 import { useRouter, usePathname, useSearchParams } from "next/navigation"
 import { 
   supabase, 
@@ -45,20 +45,23 @@ const AuthContext = createContext<AuthContextType>({
 // Função para limpar cookies e armazenamento local
 const clearAuthData = () => {
   // Limpar cookies manualmente
-  document.cookie.split(";").forEach(function(c) {
-    document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
-  });
-  
-  // Limpar armazenamento local relacionado à autenticação
-  localStorage.removeItem('supabase.auth.token');
-  localStorage.removeItem('lastAuthCheck');
+  if (typeof document !== "undefined") {
+    document.cookie.split(";").forEach(function(c) {
+      document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
+    });
+    
+    // Limpar armazenamento local relacionado à autenticação
+    localStorage.removeItem('supabase.auth.token');
+    localStorage.removeItem('lastAuthCheck');
+    sessionStorage.removeItem('supabase.auth.token');
+  }
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
-  const [authRetryCount, setAuthRetryCount] = useState(0)
+  const [authChecked, setAuthChecked] = useState(false)
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -73,7 +76,95 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Verificar parâmetro de limpeza
   const cleanupRequested = searchParams?.get('cleanup') === 'true'
 
-  // Verificar autenticação no carregamento inicial - versão simplificada
+  // Função para verificar autenticação - extraída para poder ser chamada manualmente também
+  const checkAuth = useCallback(async () => {
+    try {
+      setIsLoading(true)
+      console.log("🔍 [Auth] Verificando autenticação...")
+      
+      const { data, error } = await supabase.auth.getSession()
+      
+      if (error) {
+        console.error("❌ [Auth] Erro ao verificar sessão:", error)
+        setIsAuthenticated(false)
+        setUser(null)
+        setAuthChecked(true)
+        return
+      }
+      
+      // Se não há sessão, usuário não está autenticado
+      if (!data.session) {
+        console.log("🔍 [Auth] Nenhuma sessão encontrada, usuário não autenticado")
+        setIsAuthenticated(false)
+        setUser(null)
+        setAuthChecked(true)
+        return
+      }
+      
+      console.log("✅ [Auth] Sessão encontrada, buscando usuário...")
+      
+      // Sessão existe, buscar detalhes do usuário
+      const { user: supabaseUser } = data.session
+      
+      if (supabaseUser) {
+        // Buscar o perfil do usuário
+        try {
+          const { data: profile, error: profileError } = await getProfile(supabaseUser.id)
+          
+          if (profileError) {
+            console.error("❌ [Auth] Erro ao buscar perfil:", profileError)
+          }
+          
+          if (profile) {
+            const userData = {
+              id: supabaseUser.id,
+              email: supabaseUser.email || '',
+              name: profile.name || supabaseUser.email?.split('@')[0] || 'Usuário',
+              playerId: profile.player_id
+            }
+            
+            setUser(userData)
+            setIsAuthenticated(true)
+            console.log("✅ [Auth] Usuário autenticado com sucesso:", userData.email)
+          } else {
+            // Se não houver perfil, verificar se podemos criar um
+            console.log("⚠️ [Auth] Perfil não encontrado, tentando criar...")
+            const { data: newProfile, error: createError } = await supabase.from('profiles').insert({
+              id: supabaseUser.id,
+              name: supabaseUser.email?.split('@')[0] || 'Usuário',
+              email: supabaseUser.email,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            }).select().single()
+            
+            if (createError) {
+              console.error("❌ [Auth] Erro ao criar perfil:", createError)
+            } else if (newProfile) {
+              const userData = {
+                id: supabaseUser.id,
+                email: supabaseUser.email || '',
+                name: newProfile.name || 'Usuário',
+                playerId: newProfile.player_id
+              }
+              
+              setUser(userData)
+              setIsAuthenticated(true)
+              console.log("✅ [Auth] Perfil criado e usuário autenticado:", userData.email)
+            }
+          }
+        } catch (profileError) {
+          console.error("❌ [Auth] Erro ao buscar perfil:", profileError)
+        }
+      }
+    } catch (error) {
+      console.error("❌ [Auth] Erro ao verificar autenticação:", error)
+    } finally {
+      setIsLoading(false)
+      setAuthChecked(true)
+    }
+  }, [])
+
+  // Verificar autenticação no carregamento inicial
   useEffect(() => {
     // Se for solicitada limpeza, limpar dados antes de verificar autenticação
     if (cleanupRequested) {
@@ -81,88 +172,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       clearAuthData()
     }
     
-    const checkAuth = async () => {
-      try {
-        setIsLoading(true)
-        console.log("🔍 [Auth] Verificando autenticação inicial simplificada...")
-        
-        const { data, error } = await supabase.auth.getSession()
-        
-        if (error) {
-          console.error("❌ [Auth] Erro ao verificar sessão:", error)
-          setIsAuthenticated(false)
-          setUser(null)
-          return
-        }
-        
-        // Se não há sessão, usuário não está autenticado
-        if (!data.session) {
-          console.log("🔍 [Auth] Nenhuma sessão encontrada, usuário não autenticado")
-          setIsAuthenticated(false)
-          setUser(null)
-          return
-        }
-        
-        console.log("✅ [Auth] Sessão encontrada, buscando usuário...")
-        
-        // Sessão existe, buscar detalhes do usuário
-        const { user: supabaseUser } = data.session
-        
-        if (supabaseUser) {
-          // Buscar o perfil do usuário
-          try {
-            const { data: profile, error: profileError } = await getProfile(supabaseUser.id)
-            
-            if (profileError) {
-              console.error("❌ [Auth] Erro ao buscar perfil:", profileError)
-              
-              // Se erro for de permissão, pode ser um problema com a sessão
-              if (profileError.message.includes("permission") && authRetryCount < 2) {
-                console.log("🔄 [Auth] Tentando renovar sessão...")
-                setAuthRetryCount(prev => prev + 1)
-                await resetSession()
-                return
-              }
-            }
-            
-            if (profile) {
-              const userData = {
-                id: supabaseUser.id,
-                email: supabaseUser.email || '',
-                name: profile.name || supabaseUser.email?.split('@')[0] || 'Usuário',
-                playerId: profile.player_id
-              }
-              
-              setUser(userData)
-              setIsAuthenticated(true)
-              console.log("✅ [Auth] Usuário autenticado com sucesso:", userData.email)
-            } else if (authRetryCount < 2) {
-              // Perfil não encontrado, pode ser um problema com a API
-              console.log("🔄 [Auth] Perfil não encontrado, tentando novamente...")
-              setAuthRetryCount(prev => prev + 1)
-              setTimeout(checkAuth, 1000) // Tentar novamente após um segundo
-            }
-          } catch (profileError) {
-            console.error("❌ [Auth] Erro ao buscar perfil:", profileError)
-            
-            // Se houver erro de conexão, tentar novamente
-            if (authRetryCount < 2) {
-              console.log("🔄 [Auth] Tentando novamente buscar perfil...")
-              setAuthRetryCount(prev => prev + 1)
-              setTimeout(checkAuth, 1500) // Tentar novamente após 1.5 segundos
-            }
-          }
-        }
-      } catch (error) {
-        console.error("❌ [Auth] Erro ao verificar autenticação:", error)
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
+    // Executar verificação de autenticação
     checkAuth()
     
-    // Configurar listener básico para mudanças de autenticação
+    // Configurar listener para mudanças de autenticação
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         console.log("🔍 [Auth] Evento de autenticação:", event)
@@ -181,10 +194,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setUser(userData)
             setIsAuthenticated(true)
             
-            // Navegar para dashboard de forma simples
-            if (window.location.pathname === '/login') {
-              router.push('/dashboard')
-            }
+            // Redireção após login bem-sucedido
+            // Usar timeout para garantir que a mudança de estado seja processada
+            setTimeout(() => {
+              const redirectTo = searchParams?.get('redirect') || '/dashboard'
+              console.log("🔄 [Auth] Redirecionando após login para:", redirectTo)
+              
+              // Usar window.location para navegação mais forte
+              // em vez de router.push que às vezes falha por conta de estado
+              window.location.href = redirectTo
+            }, 500)
           } catch (error) {
             console.error("❌ [Auth] Erro ao processar login:", error)
           }
@@ -192,8 +211,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setUser(null)
           setIsAuthenticated(false)
           
-          // Navegar para login de forma simples
+          // Navegar para login se não estamos em uma página pública
           if (!isPublicPage) {
+            console.log("🔄 [Auth] Redirecionando para login após logout")
+            // Usar router.push para navegação após logout
             router.push('/login')
           }
         }
@@ -203,7 +224,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => {
       authListener.subscription.unsubscribe()
     }
-  }, [router, authRetryCount, isPublicPage, cleanupRequested, pathname, searchParams])
+  }, [router, isPublicPage, cleanupRequested, pathname, searchParams, checkAuth])
 
   // Função para reset completo da sessão
   const resetSession = async () => {
@@ -231,9 +252,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  // Função de login simplificada
+  // Função de login
   const login = async (email: string, password: string) => {
     try {
+      console.log("🔑 [Auth] Tentando fazer login:", email)
+      
       // Limpar estado e cookies antigos antes de tentar fazer login
       clearAuthData()
       
@@ -241,144 +264,137 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const { data, error } = await signInWithEmail(email, password)
       
       if (error) {
+        console.error("❌ [Auth] Erro de login:", error.message)
         if (error.message.includes("Invalid login credentials")) {
           return { success: false, error: "Email ou senha incorretos. Por favor, verifique suas credenciais." }
         }
+        
+        if (error.message.includes("cors") || error.message.includes("CORS")) {
+          return { success: false, error: "Erro de CORS detectado. Isso pode ser causado por bloqueio no navegador ou configurações de rede." }
+        }
+        
         return { success: false, error: error.message }
       }
       
-      // Garantir que a sessão esteja armazenada corretamente
-      await supabase.auth.getSession()
+      // Se chegou aqui, login foi bem-sucedido
+      console.log("✅ [Auth] Login bem-sucedido:", data.user?.email)
       
-      // Após login bem-sucedido, redirecionar para o dashboard
-      if (data.user) {
-        router.push('/dashboard')
-      }
+      // Não precisamos setar aqui o usuário, pois o evento onAuthStateChange vai cuidar disso
+      // e também fazer o redirecionamento
       
       return { success: true }
-    } catch (error) {
-      console.error("❌ [Auth] Erro ao fazer login:", error)
+    } catch (error: any) {
+      console.error("❌ [Auth] Erro inesperado no login:", error)
       return { 
         success: false, 
-        error: error instanceof Error ? error.message : "Erro desconhecido ao fazer login" 
+        error: error.message || "Erro desconhecido ao fazer login. Tente novamente mais tarde."
       }
     }
   }
 
-  // Função de registro
+  // Função para registrar novo usuário
   const register = async (email: string, password: string, name: string) => {
     try {
-      // Limpar dados antigos primeiro
+      console.log("🔑 [Auth] Registrando novo usuário:", email)
+      
+      // Limpar dados antigos
       clearAuthData()
       
-      const { data, error } = await signUpWithEmail(email, password, { name })
+      // Dados adicionais para o perfil
+      const metadata = {
+        name,
+      }
+      
+      // Registrar usuário
+      const { data, error } = await signUpWithEmail(email, password, metadata)
       
       if (error) {
+        console.error("❌ [Auth] Erro ao registrar:", error.message)
         if (error.message.includes("already registered")) {
-          return { success: false, error: "Este email já está registrado. Por favor, faça login ou use outro email." }
+          return { success: false, error: "Este email já está registrado. Tente fazer login ou recuperar sua senha." }
         }
         return { success: false, error: error.message }
       }
       
-      // Criar perfil do usuário com um player_id aleatório
-      if (data.user) {
-        const playerId = Math.random().toString(36).substring(2, 10).toUpperCase()
-        
-        await supabase
-          .from('profiles')
-          .insert([
-            { 
-              id: data.user.id,
-              name,
-              player_id: playerId
-            }
-          ])
-      }
+      console.log("✅ [Auth] Registro bem-sucedido:", data.user?.email)
       
-      return { success: true }
-    } catch (error) {
-      console.error("❌ [Auth] Erro ao registrar:", error)
+      // Em caso de sucesso, fazer login automaticamente
+      return await login(email, password)
+    } catch (error: any) {
+      console.error("❌ [Auth] Erro inesperado no registro:", error)
       return { 
         success: false, 
-        error: error instanceof Error ? error.message : "Erro desconhecido ao registrar" 
+        error: error.message || "Erro desconhecido ao registrar. Tente novamente mais tarde."
       }
     }
   }
 
-  // Função de logout simplificada
+  // Função para logout
   const logout = async () => {
+    console.log("🔑 [Auth] Fazendo logout")
     try {
-      // Limpar estado local primeiro
+      await signOut()
+      clearAuthData()
       setUser(null)
       setIsAuthenticated(false)
       
-      // Fazer logout no Supabase
-      await signOut()
-      
-      // Limpar dados de autenticação
-      clearAuthData()
-      
-      // Redirecionar para a página de login
+      // Navegar para página de login
       router.push('/login')
     } catch (error) {
       console.error("❌ [Auth] Erro ao fazer logout:", error)
       
-      // Em caso de erro, tentar forçar um logout mais agressivo
-      try {
-        await supabase.auth.signOut({ scope: 'global' });
-        window.location.href = '/login';
-      } catch (e) {
-        console.error("❌ [Auth] Erro no logout de emergência:", e);
-        // Último recurso: recarregar a página para login
-        window.location.href = '/login?cleanup=true';
-      }
+      // Mesmo com erro, limpar dados locais
+      clearAuthData()
+      setUser(null)
+      setIsAuthenticated(false)
+      
+      // Forçar navegação para login
+      window.location.href = '/login'
     }
   }
 
-  // Função para atualizar o perfil do usuário
+  // Função para atualizar perfil
   const updateUserProfile = async (updates: Partial<User>) => {
-    if (!user?.id) {
+    if (!user) {
       return { success: false, error: "Usuário não autenticado" }
     }
-
+    
     try {
-      const supabaseUpdates: any = {}
-      
-      if (updates.name) supabaseUpdates.name = updates.name
-      if (updates.playerId) supabaseUpdates.player_id = updates.playerId
+      console.log("📝 [Auth] Atualizando perfil do usuário:", user.id)
       
       const { error } = await supabase
         .from('profiles')
-        .update(supabaseUpdates)
+        .update({
+          ...updates,
+          updated_at: new Date().toISOString()
+        })
         .eq('id', user.id)
       
       if (error) {
+        console.error("❌ [Auth] Erro ao atualizar perfil:", error)
         return { success: false, error: error.message }
       }
       
-      // Atualizar o estado local
-      setUser(prevUser => {
-        if (!prevUser) return null
-        return { ...prevUser, ...updates }
-      })
+      // Atualizar estado local
+      setUser({ ...user, ...updates })
       
       return { success: true }
-    } catch (error) {
-      console.error("❌ [Auth] Erro ao atualizar perfil:", error)
+    } catch (error: any) {
+      console.error("❌ [Auth] Erro inesperado ao atualizar perfil:", error)
       return { 
         success: false, 
-        error: error instanceof Error ? error.message : "Erro desconhecido ao atualizar perfil" 
+        error: error.message || "Erro desconhecido ao atualizar perfil."
       }
     }
   }
 
   return (
-    <AuthContext.Provider 
-      value={{ 
-        user, 
-        isAuthenticated, 
+    <AuthContext.Provider
+      value={{
+        user,
+        isAuthenticated,
         isLoading,
-        login, 
+        login,
         register,
         logout,
         updateUserProfile,

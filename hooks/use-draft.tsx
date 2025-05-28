@@ -115,7 +115,7 @@ export function DraftProvider({ children }: { children: React.ReactNode }) {
 
       try {
         const draftId = uuidv4()
-        const newDraft: DraftState = {
+        const newDraft = {
           id: draftId,
           phase: "preban" as DraftPhase,
           turn: "player1",
@@ -136,7 +136,7 @@ export function DraftProvider({ children }: { children: React.ReactNode }) {
             player1: [],
             player2: [],
           },
-          currentPick: 0,
+          current_pick: 0, // Usar snake_case diretamente
           maxPicks: settings.maxPicks,
           maxBans: settings.maxBans,
           completed: false,
@@ -145,24 +145,21 @@ export function DraftProvider({ children }: { children: React.ReactNode }) {
           updated_at: new Date().toISOString(),
         }
 
-        // Preparar objeto para salvar no Supabase com snake_case para a coluna currentPick
-        const dbDraft = {
-          ...newDraft,
-          current_pick: newDraft.currentPick, // Adicionar campo com nome em snake_case
-          // Remove camelCase field to avoid duplication
-          currentPick: undefined
-        };
-
         // Salvar no Supabase
         const { error: saveError } = await supabase
           .from('drafts')
-          .insert([dbDraft])
+          .insert([newDraft])
 
         if (saveError) {
           throw new Error(`Erro ao salvar draft: ${saveError.message}`)
         }
 
-        setDraft(newDraft)
+        // Ao definir no estado, mapeie current_pick para currentPick para manter compatibilidade
+        setDraft({
+          ...newDraft,
+          currentPick: newDraft.current_pick 
+        } as DraftState)
+        
         return draftId
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : "Erro desconhecido"
@@ -276,6 +273,7 @@ export function DraftProvider({ children }: { children: React.ReactNode }) {
         }
 
         // Aumentar o número do pick atual se passamos pelo ciclo player1 -> player2 -> player1
+        // Use currentPick do estado para lógica de aplicação
         const nextCurrentPick = nextTurn === "player1" ? draft.currentPick + 1 : draft.currentPick
 
         // Verificar se o draft deve mudar para a fase de banimento
@@ -289,11 +287,11 @@ export function DraftProvider({ children }: { children: React.ReactNode }) {
         // Verificar se o draft foi concluído
         const isPickingCompleted = nextCurrentPick === draft.maxPicks && nextTurn === "player1"
         
-        // Atualizar no Supabase
+        // Atualizar no Supabase - use current_pick (snake_case) para o banco de dados
         const updateData = {
           picks: updatedPicks,
           turn: nextTurn,
-          current_pick: nextCurrentPick, // Usar snake_case aqui
+          current_pick: nextCurrentPick, // Usar snake_case para o banco
           phase: isPickingCompleted ? "complete" : nextPhase,
           completed: isPickingCompleted,
           updated_at: new Date().toISOString()
@@ -309,12 +307,12 @@ export function DraftProvider({ children }: { children: React.ReactNode }) {
           return false
         }
 
-        // Atualizar o estado local
+        // Atualizar o estado local - use currentPick (camelCase) para o estado
         setDraft({
           ...draft,
           picks: updatedPicks,
           turn: nextTurn,
-          currentPick: nextCurrentPick,
+          currentPick: nextCurrentPick, // Usar camelCase para o estado
           phase: isPickingCompleted ? "complete" : nextPhase,
           completed: isPickingCompleted,
           updated_at: new Date().toISOString()
@@ -406,40 +404,27 @@ export function DraftProvider({ children }: { children: React.ReactNode }) {
   // Atualizar um draft existente
   const updateDraft = useCallback(
     async (updatedDraft: Partial<DraftState>): Promise<void> => {
-      if (!draft?.id) {
-        throw new Error("Nenhum draft selecionado")
+      if (!draft) {
+        throw new Error("Nenhum draft ativo para atualizar")
       }
 
       setIsLoading(true)
       setError(null)
 
       try {
-        // Preparar os dados para o formato esperado pelo banco de dados (snake_case)
-        const dbUpdate: any = { ...updatedDraft };
+        // Converter camelCase para snake_case para o banco de dados
+        const dbUpdateData: any = { ...updatedDraft }
         
-        // Se estiver atualizando currentPick, usar o nome da coluna em snake_case
+        // Se currentPick estiver sendo atualizado, converter para current_pick
         if (updatedDraft.currentPick !== undefined) {
-          dbUpdate.current_pick = updatedDraft.currentPick;
-          delete dbUpdate.currentPick;
+          dbUpdateData.current_pick = updatedDraft.currentPick
+          delete dbUpdateData.currentPick // Remover versão camelCase
         }
 
-        // Certificar-se que outros campos camelCase são convertidos para snake_case
-        if (updatedDraft.maxPicks !== undefined) {
-          dbUpdate.max_picks = updatedDraft.maxPicks;
-          delete dbUpdate.maxPicks;
-        }
-        
-        if (updatedDraft.maxBans !== undefined) {
-          dbUpdate.max_bans = updatedDraft.maxBans;
-          delete dbUpdate.maxBans;
-        }
-
-        // Adicionar timestamp de atualização
-        dbUpdate.updated_at = new Date().toISOString();
-
+        // Atualizar no Supabase
         const { error } = await supabase
           .from('drafts')
-          .update(dbUpdate)
+          .update(dbUpdateData)
           .eq('id', draft.id)
 
         if (error) {
@@ -450,17 +435,15 @@ export function DraftProvider({ children }: { children: React.ReactNode }) {
         setDraft({
           ...draft,
           ...updatedDraft,
-          updated_at: dbUpdate.updated_at
         })
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : "Erro desconhecido"
         setError(new Error(errorMessage))
-        throw err
       } finally {
         setIsLoading(false)
       }
     },
-    [draft]
+    [draft],
   )
 
   // Buscar um draft específico pelo ID
@@ -477,11 +460,11 @@ export function DraftProvider({ children }: { children: React.ReactNode }) {
           return null
         }
 
-        // Mapear current_pick para currentPick se necessário
+        // Mapear current_pick para currentPick para manter compatibilidade
         const draftData = data as any;
         const draft: DraftState = {
           ...draftData,
-          currentPick: draftData.current_pick !== undefined ? draftData.current_pick : draftData.currentPick || 0,
+          currentPick: draftData.current_pick || 0, // Usar apenas current_pick do banco
         };
 
         return draft;
@@ -511,10 +494,10 @@ export function DraftProvider({ children }: { children: React.ReactNode }) {
         return []
       }
 
-      // Mapear current_pick para currentPick se necessário
+      // Mapear current_pick para currentPick para manter compatibilidade
       const drafts = (data || []).map((draft: any) => ({
         ...draft,
-        currentPick: draft.current_pick !== undefined ? draft.current_pick : draft.currentPick || 0,
+        currentPick: draft.current_pick || 0, // Usar apenas current_pick do banco
       }));
 
       return drafts

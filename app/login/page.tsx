@@ -25,6 +25,7 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   const [cleaningSession, setCleaningSession] = useState(false)
+  const [attemptedRedirect, setAttemptedRedirect] = useState(false)
   const { login, isAuthenticated, isLoading, resetSession } = useAuth()
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -33,11 +34,16 @@ export default function LoginPage() {
 
   // Verificar se o usuário já está autenticado
   useEffect(() => {
-    if (isAuthenticated) {
-      console.log("Usuário já autenticado, redirecionando para dashboard")
-      router.push(redirectTo)
+    if (isAuthenticated && !attemptedRedirect) {
+      console.log("Usuário já autenticado, redirecionando para", redirectTo)
+      setAttemptedRedirect(true) // Evitar múltiplas tentativas
+      
+      // Usar timeout para garantir que o estado seja atualizado antes do redirecionamento
+      setTimeout(() => {
+        router.push(redirectTo)
+      }, 100)
     }
-  }, [isAuthenticated, router, redirectTo])
+  }, [isAuthenticated, router, redirectTo, attemptedRedirect])
 
   // Adicionar código para limpar cookies corrompidos ao entrar na página
   useEffect(() => {
@@ -53,6 +59,7 @@ export default function LoginPage() {
       // Limpar localStorage relacionado à autenticação
       localStorage.removeItem('supabase.auth.token');
       localStorage.removeItem('lastAuthCheck');
+      sessionStorage.removeItem('supabase.auth.token');
       
       setTimeout(() => {
         setCleaningSession(false)
@@ -89,7 +96,14 @@ export default function LoginPage() {
       
       setSuccess("Login realizado com sucesso! Redirecionando...")
       
-    } catch (error) {
+      // Garantir que o redirecionamento aconteça mesmo se o evento de auth não disparar
+      setTimeout(() => {
+        if (typeof window !== 'undefined') {
+          window.location.href = redirectTo
+        }
+      }, 1500)
+      
+    } catch (error: any) {
       console.error("Erro ao fazer login:", error)
       setError("Erro inesperado ao fazer login. Por favor, tente novamente.")
     } finally {
@@ -111,6 +125,11 @@ export default function LoginPage() {
     } finally {
       setCleaningSession(false)
     }
+  }
+
+  const handleTestLogin = () => {
+    setEmail("teste@example.com")
+    setPassword("Teste@123")
   }
 
   return (
@@ -183,10 +202,7 @@ export default function LoginPage() {
           <Button 
             variant="outline"
             className="w-full" 
-            onClick={() => {
-              setEmail("teste@teste.com")
-              setPassword("teste123")
-            }}
+            onClick={handleTestLogin}
             disabled={loading || isLoading || cleaningSession}
           >
             Entrar para teste (sem cadastro)

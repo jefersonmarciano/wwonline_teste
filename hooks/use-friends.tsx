@@ -63,21 +63,24 @@ export function FriendsProvider({ children }: { children: React.ReactNode }) {
     setError(null)
 
     try {
-      // Buscar amigos no Supabase
+      console.log("🔍 [Friends] Buscando amigos para usuário:", user.id)
+      
+      // Buscar amigos no Supabase - com tratamento de erro refinado
       const { data: friendsData, error: friendsError } = await supabase
         .from('friends')
         .select(`
           id,
           friend_id,
-          profiles(id, name, player_id, avatar_url, last_active)
+          profiles!friends_friend_id_fkey(id, name, player_id, avatar_url, last_active)
         `)
         .eq('user_id', user.id)
 
       if (friendsError) {
-        throw new Error(`Erro ao carregar amigos: ${friendsError.message}`)
+        console.error("❌ [Friends] Erro ao buscar amigos:", friendsError)
+        // Continuar o fluxo mesmo com erro, para não bloquear outras funcionalidades
       }
 
-      // Buscar solicitações pendentes recebidas e seus respectivos remetentes
+      // Buscar solicitações pendentes recebidas
       const { data: pendingData, error: pendingError } = await supabase
         .from('friend_requests')
         .select(`
@@ -91,27 +94,30 @@ export function FriendsProvider({ children }: { children: React.ReactNode }) {
         .eq('status', 'pending')
 
       if (pendingError) {
-        throw new Error(`Erro ao carregar solicitações pendentes: ${pendingError.message}`)
+        console.error("❌ [Friends] Erro ao buscar solicitações pendentes:", pendingError)
       }
 
       // Buscar perfis para os remetentes de solicitações pendentes
       let pendingProfiles: Record<string, any> = {};
-      if (pendingData.length > 0) {
+      if (pendingData && pendingData.length > 0) {
         const senderIds = pendingData.map(req => req.sender_id);
-        const { data: senderProfiles, error: senderProfilesError } = await supabase
-          .from('profiles')
-          .select('id, name, player_id')
-          .in('id', senderIds);
         
-        if (senderProfilesError) {
-          throw new Error(`Erro ao carregar perfis de remetentes: ${senderProfilesError.message}`);
+        if (senderIds.length > 0) {
+          const { data: senderProfiles, error: senderProfilesError } = await supabase
+            .from('profiles')
+            .select('id, name, player_id')
+            .in('id', senderIds);
+          
+          if (senderProfilesError) {
+            console.error("❌ [Friends] Erro ao buscar perfis de remetentes:", senderProfilesError)
+          } else if (senderProfiles) {
+            // Indexar por ID para fácil acesso
+            pendingProfiles = senderProfiles.reduce((acc, profile) => {
+              acc[profile.id] = profile;
+              return acc;
+            }, {} as Record<string, any>);
+          }
         }
-
-        // Indexar por ID para fácil acesso
-        pendingProfiles = senderProfiles.reduce((acc, profile) => {
-          acc[profile.id] = profile;
-          return acc;
-        }, {} as Record<string, any>);
       }
 
       // Buscar solicitações enviadas
@@ -128,34 +134,39 @@ export function FriendsProvider({ children }: { children: React.ReactNode }) {
         .eq('status', 'pending')
 
       if (sentError) {
-        throw new Error(`Erro ao carregar solicitações enviadas: ${sentError.message}`)
+        console.error("❌ [Friends] Erro ao buscar solicitações enviadas:", sentError)
       }
 
       // Buscar perfis para os destinatários de solicitações enviadas
       let receiverProfiles: Record<string, any> = {};
-      if (sentData.length > 0) {
+      if (sentData && sentData.length > 0) {
         const receiverIds = sentData.map(req => req.receiver_id);
-        const { data: receiverProfilesData, error: receiverProfilesError } = await supabase
-          .from('profiles')
-          .select('id, name, player_id')
-          .in('id', receiverIds);
         
-        if (receiverProfilesError) {
-          throw new Error(`Erro ao carregar perfis de destinatários: ${receiverProfilesError.message}`);
+        if (receiverIds.length > 0) {
+          const { data: receiverProfilesData, error: receiverProfilesError } = await supabase
+            .from('profiles')
+            .select('id, name, player_id')
+            .in('id', receiverIds);
+          
+          if (receiverProfilesError) {
+            console.error("❌ [Friends] Erro ao buscar perfis de destinatários:", receiverProfilesError)
+          } else if (receiverProfilesData) {
+            // Indexar por ID para fácil acesso
+            receiverProfiles = receiverProfilesData.reduce((acc, profile) => {
+              acc[profile.id] = profile;
+              return acc;
+            }, {} as Record<string, any>);
+          }
         }
-
-        // Indexar por ID para fácil acesso
-        receiverProfiles = receiverProfilesData.reduce((acc, profile) => {
-          acc[profile.id] = profile;
-          return acc;
-        }, {} as Record<string, any>);
       }
 
       // Formatar os amigos
-      const formattedFriends = friendsData.map((item: any) => {
+      const formattedFriends = (friendsData || []).map((item: any) => {
         const profile = item.profiles || {};
         return {
           id: item.id,
+          userId: user.id,
+          friendId: item.friend_id,
           name: profile.name || 'Desconhecido',
           playerId: profile.player_id || '',
           avatar: profile.avatar_url,
@@ -164,10 +175,10 @@ export function FriendsProvider({ children }: { children: React.ReactNode }) {
                   new Date(profile.last_active).getTime() > Date.now() - 1000 * 60 * 5 
                   : false
         };
-      })
+      });
 
       // Formatar solicitações pendentes com perfis do remetente
-      const formattedPending = pendingData.map((item: any) => {
+      const formattedPending = (pendingData || []).map((item: any) => {
         const senderProfile = pendingProfiles[item.sender_id] || {};
         return {
           id: item.id,
@@ -178,10 +189,10 @@ export function FriendsProvider({ children }: { children: React.ReactNode }) {
           status: item.status,
           created_at: item.created_at
         };
-      })
+      });
 
       // Formatar solicitações enviadas com perfis do destinatário
-      const formattedSent = sentData.map((item: any) => {
+      const formattedSent = (sentData || []).map((item: any) => {
         const receiverProfile = receiverProfiles[item.receiver_id] || {};
         return {
           id: item.id,
@@ -192,14 +203,20 @@ export function FriendsProvider({ children }: { children: React.ReactNode }) {
           status: item.status,
           created_at: item.created_at
         };
-      })
+      });
+
+      console.log("✅ [Friends] Dados carregados com sucesso:", {
+        amigos: formattedFriends.length,
+        solicitacoesPendentes: formattedPending.length,
+        solicitacoesEnviadas: formattedSent.length
+      });
 
       setFriends(formattedFriends)
       setPendingRequests(formattedPending)
       setSentRequests(formattedSent)
     } catch (err) {
-      console.error("Erro ao carregar amigos:", err)
-      setError(err instanceof Error ? err : new Error('Erro desconhecido'))
+      console.error("❌ [Friends] Erro crítico ao carregar dados:", err)
+      setError(err instanceof Error ? err : new Error('Erro desconhecido ao carregar amigos'))
     } finally {
       setIsLoading(false)
     }
